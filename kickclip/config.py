@@ -61,12 +61,21 @@ class ClipConfig:
     bell_file: Optional[str] = None     # kendi zil sesin (wav/mp3). Boşsa sentetik zil üretilir
     bell_volume: float = 0.9
 
+    # --- Çıktı çözünürlüğü ---
+    resolution: str = "4k"              # 4k (2160x3840) | 1080p (1080x1920). Yerleşim 1080 tabanlı hesaplanır, sonra büyütülür
+
     # --- Kodlama ---
     crf: int = 20
     preset: str = "veryfast"
     fps: int = 30
 
     extra: dict = field(default_factory=dict)
+
+    def out_size(self) -> tuple[int, int]:
+        """Son çıktı boyutu (w, h)."""
+        if str(self.resolution).lower() in ("4k", "2160", "2160p", "uhd"):
+            return 2160, 3840
+        return self.width, self.height
 
     def to_dict(self) -> dict:
         return asdict(self)

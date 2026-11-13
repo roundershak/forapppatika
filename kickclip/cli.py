@@ -66,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--blur", type=float, default=d.blur_strength)
 
     e = p.add_argument_group("kodlama")
+    e.add_argument("--resolution", choices=["4k", "1080p"], default=d.resolution,
+                   help="çıktı çözünürlüğü: 4k = 2160x3840 (varsayılan), 1080p = 1080x1920")
     e.add_argument("--crf", type=int, default=d.crf)
     e.add_argument("--preset", default=d.preset)
     e.add_argument("--fps", type=int, default=d.fps)
@@ -82,7 +84,7 @@ def args_to_config(a: argparse.Namespace) -> ClipConfig:
         language=None if (a.lang or "").lower() in ("", "auto") else a.lang, device=a.device,
         font=a.font, font_size=a.font_size, words_per_line=a.words, highlight_color=a.color,
         sub_position=a.sub_pos, titles=not a.no_titles, streamer=a.streamer, intro=not a.no_intro, bell_file=a.bell, bell_volume=a.bell_volume,
-        intro_hold=a.hold, intro_fade=a.fade, blur_strength=a.blur, crf=a.crf, preset=a.preset, fps=a.fps,
+        intro_hold=a.hold, intro_fade=a.fade, blur_strength=a.blur, crf=a.crf, resolution=a.resolution, preset=a.preset, fps=a.fps,
     )
 
 

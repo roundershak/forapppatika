@@ -17,6 +17,20 @@ class Word:
     text: str
 
 
+def _quiet_hf() -> None:
+    """Hugging Face'in zararsız Windows uyarılarını (symlink, HF_TOKEN) gizler."""
+    import warnings
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+    warnings.filterwarnings("ignore", message=".*symlinks.*")
+    warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
+    try:
+        from huggingface_hub.utils import logging as hf_logging
+        hf_logging.set_verbosity_error()
+    except Exception:
+        pass
+
+
 class Transcriber:
     def __init__(self, model: str = "small", device: str = "auto", language: Optional[str] = "tr",
                  log: Logger = default_log):
@@ -31,6 +45,7 @@ class Transcriber:
         if self._error is not None:  # bir kez başarısız olduysa her seferinde yeniden denemesin
             raise self._error
         if self._model is None:
+            _quiet_hf()
             from faster_whisper import WhisperModel
             device = self.device
             if device == "auto":
@@ -40,7 +55,8 @@ class Transcriber:
                 except Exception:
                     device = "cpu"
             compute = "float16" if device == "cuda" else "int8"
-            self.log(f"Whisper modeli yükleniyor: {self.model_name} ({device}) - ilk seferde indirilir...")
+            self.log(f"Whisper modeli yükleniyor: {self.model_name} ({device}). İlk seferde internetten indirilir "
+                     f"(small ≈ 480 MB, birkaç dakika sürebilir; sadece bir kez).")
             try:
                 self._model = WhisperModel(self.model_name, device=device, compute_type=compute)
             except Exception as e:

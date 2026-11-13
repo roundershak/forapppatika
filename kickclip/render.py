@@ -68,6 +68,13 @@ def build_filtergraph(cfg: ClipConfig, cam: Optional[Rect], screen_mode: str, sc
         parts.append("[sharp][blurred]overlay=shortest=1:format=auto[intro]")
         last = "intro"
 
+    OW, OH = cfg.out_size()
+    if (OW, OH) != (W, H):
+        # 4K: yerleşim 1080x1920'de kurulur, lanczos ile büyütülüp hafif keskinleştirilir;
+        # altyazı büyütmeden SONRA 4K çözünürlükte çizilir (yazılar jilet gibi kalır)
+        parts.append(f"[{last}]scale={OW}:{OH}:flags=lanczos,unsharp=5:5:0.5:5:5:0.0[up]")
+        last = "up"
+
     if ass_file:
         opt = f"ass={ass_file}"
         if fonts_dir:
@@ -121,8 +128,11 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
         cmd += ["-i", os.path.abspath(bell)]
     cmd += ["-filter_complex_script", os.path.basename(graph_file),
             "-map", vlabel, "-map", alabel,
-            "-c:v", "libx264", "-preset", cfg.preset, "-crf", str(cfg.crf),
+            "-c:v", "libx264", "-preset", cfg.preset, "-crf", str(cfg.crf - 2 if cfg.out_size()[1] > 1920 else cfg.crf),
             "-profile:v", "high", "-pix_fmt", "yuv420p", "-r", str(cfg.fps),
+            # YouTube önerisi: kapalı GOP = kare hızının yarısı, 2 B-kare; 4K30 için seviye 5.1
+            "-g", str(max(1, cfg.fps // 2)), "-bf", "2", "-flags", "+cgop",
+            *(["-level:v", "5.1"] if cfg.out_size()[1] > 1920 else []),
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-t", f"{duration:.3f}", "-movflags", "+faststart",
             os.path.abspath(out_path)]

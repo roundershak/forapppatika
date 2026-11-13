@@ -146,6 +146,7 @@ YouTube, uygulamaların video yükleyebilmesi için senin adına bir "Google Clo
 | `--bell dosya.mp3` | Kendi zil sesin. Ya da `assets/bell.wav` / `assets/zil.mp3` olarak koy |
 | `--streamer ad` | Hashtag'lerde kullanılacak yayıncı adı (varsayılan: linkten) |
 | `--no-titles` | Başlık üretme |
+| `--resolution 4k` / `1080p` | Çıktı: 4K 2160x3840 30 fps (varsayılan; YouTube 4K'ya VP9 ve yüksek bit hızı verir, Shorts'ta daha net görünür) ya da 1080p (daha hızlı) |
 | `--no-subs`, `--no-intro` | Altyazıyı / giriş efektini kapat |
 
 **Yazı tipi:** varsayılan `Montserrat ExtraBold`. İstediğin `.ttf`/`.otf` dosyasını `assets/fonts/` içine koyup
@@ -182,7 +183,7 @@ Canlı yayında akış henüz bitmediği için belirtilen süre (`--live-minutes
 | Ses taraması | internet hızına bağlı, genelde 3-10 dk (yerel dosyada ~1 dk) |
 | Whisper (25 aday × ~50 sn) | NVIDIA GPU: 1-2 dk · CPU (`small`): 8-15 dk · CPU (`base`): 3-5 dk |
 | Claude seçimi | 15-60 sn |
-| Klip başına render (30 sn, 1080p) | 15-40 sn |
+| Klip başına render (30 sn) | 1080p: 15-40 sn · 4K: 1-2 dk |
 
 Hızlandırmak için: `--range` ile aralık seç, `--model base`, `--candidates 15`.
 

@@ -115,6 +115,8 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         log(f"Kamera alanı: x={cam.x} y={cam.y} w={cam.w} h={cam.h}")
     log(f"Ekran alanı ({screen_mode}): x={screen.x} y={screen.y} w={screen.w} h={screen.h}")
     sub_pos = cfg.sub_position if cam else max(cfg.sub_position, 0.70)
+    ow, oh = cfg.out_size()
+    log(f"Çıktı: {ow}x{oh}, {cfg.fps} fps")
 
     bell = get_bell(cfg.bell_file, cfg.work_dir) if cfg.intro else None
     fonts_dir = os.path.join(ROOT, "assets", "fonts")
@@ -149,8 +151,9 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         if cfg.subtitles and words:
             from .subtitles import Word
             rel = [Word(w.start - seg.start, w.end - seg.start, w.text) for w in words]
-            ass_path = build_ass(rel, os.path.join(tmp_dir, f"{name}.ass"), cfg.width, cfg.height,
-                                 cfg.font, cfg.font_size, cfg.words_per_line, cfg.uppercase,
+            ow, oh = cfg.out_size()
+            ass_path = build_ass(rel, os.path.join(tmp_dir, f"{name}.ass"), ow, oh,
+                                 cfg.font, round(cfg.font_size * ow / cfg.width), cfg.words_per_line, cfg.uppercase,
                                  cfg.highlight_color, sub_pos)
 
         log(f"[{idx}/{n}] Render ediliyor (sadece bu {seg.duration:.0f} sn çekiliyor)...")
