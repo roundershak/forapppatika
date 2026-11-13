@@ -103,3 +103,31 @@ def video_encoder_args(crf: int, preset: str, level: str | None) -> list[str]:
     if level:
         args += ["-level:v", level]
     return args
+
+
+def check_dlls() -> dict:
+    """Windows'ta CUDA DLL'leri yüklenebiliyor mu (teşhis için)."""
+    add_cuda_dll_dirs()
+    res = {}
+    if sys.platform != "win32":
+        return res
+    import ctypes
+    for name in ("cublas64_12.dll", "cublasLt64_12.dll", "cudnn64_9.dll"):
+        try:
+            ctypes.WinDLL(name)
+            res[name] = "OK"
+        except OSError as e:
+            res[name] = f"YOK ({e})"
+    return res
+
+
+def report() -> str:
+    lines = [f"NVIDIA kart     : {nvidia_name() or 'bulunamadı'}",
+             f"CUDA cihaz sayısı (Whisper): {cuda_devices()}",
+             f"NVENC (video kodlama): {'çalışıyor' if nvenc_ok() else 'yok/çalışmıyor'}"]
+    for k, v in check_dlls().items():
+        lines.append(f"{k:20s}: {v}")
+    if nvidia_name() and any(v != "OK" for v in check_dlls().values()):
+        lines.append("\nEksik DLL var: baslat.bat'i kapatıp yeniden aç (CUDA kütüphanelerini kurar) ya da:\n"
+                     "  .venv\\Scripts\\python -m pip install -r requirements-gpu.txt")
+    return "\n".join(lines)

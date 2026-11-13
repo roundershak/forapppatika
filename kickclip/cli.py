@@ -154,6 +154,10 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(1)
         return
     _load_env()
+    if argv and argv[0] == "gpu":
+        from . import gpu
+        print(gpu.report())
+        return
     if argv and argv[0] == "guncelle":
         from . import updater
         info = updater.check()

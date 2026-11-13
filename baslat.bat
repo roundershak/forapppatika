@@ -87,6 +87,7 @@ if not errorlevel 1 (
       echo [!] CUDA kutuphaneleri kurulamadi, Whisper islemcide calisacak.
     ) else (
       copy /y requirements-gpu.txt ".venv\gpu.stamp" >nul
+      "%VPY%" -m kickclip gpu
     )
   ) else (
     echo [OK] NVIDIA ekran karti ve CUDA kutuphaneleri hazir.

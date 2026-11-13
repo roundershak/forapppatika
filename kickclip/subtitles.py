@@ -31,6 +31,11 @@ def _quiet_hf() -> None:
         pass
 
 
+def _is_gpu_error(e: Exception) -> bool:
+    m = str(e).lower()
+    return any(k in m for k in ("cublas", "cudnn", "cuda", "cudart", ".dll", "libcu", "nvrtc", "gpu"))
+
+
 def _load_audio(path: str):
     """Sesi 16 kHz mono float32 dizi olarak okur (ffmpeg ile).
     faster-whisper'ın dosya okuyucusu (PyAV) yeni sürümlerde uyumsuz olabildiği için kullanılmıyor."""
@@ -50,6 +55,7 @@ class Transcriber:
         self.log = log
         self._model = None
         self._error: Exception | None = None
+        self._device: str | None = None
 
     def _load(self):
         if self._error is not None:  # bir kez başarısız olduysa her seferinde yeniden denemesin
@@ -76,6 +82,7 @@ class Transcriber:
                         import numpy as np
                         list(model.transcribe(np.zeros(16000, dtype=np.float32), language="tr")[0])
                     self._model = model
+                    self._device = dev
                     gpu.WHISPER_STATE.update(device=dev, error=None)
                     if dev == "cuda":
                         self.log("Whisper ekran kartında çalışıyor ✓")
@@ -103,7 +110,19 @@ class Transcriber:
 
         threading.Thread(target=beat, daemon=True).start()
         try:
-            return self._words(audio_path)
+            try:
+                return self._words(audio_path)
+            except Exception as e:
+                if not _is_gpu_error(e) or self._device == "cpu":
+                    raise
+                # ekran kartı kütüphanesi eksik/bozuk -> işlemciye geç, aynı parçayı tekrar dene
+                from . import gpu
+                gpu.WHISPER_STATE.update(device="cpu", error=str(e)[:300])
+                self.log(f"Ekran kartı Whisper'da hata verdi ({str(e)[:120]}). İşlemciye geçiliyor; "
+                         f"ekran kartı için baslat.bat'i yeniden çalıştır (CUDA kütüphanelerini kurar).")
+                self._model = None
+                self.device = "cpu"
+                return self._words(audio_path)
         finally:
             done.set()
 
