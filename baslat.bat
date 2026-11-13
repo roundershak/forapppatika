@@ -17,29 +17,40 @@ if not exist "kickclip\__init__.py" (
   goto :fail
 )
 
-rem --- Python bul ---
+rem --- Uyumlu Python bul: 64-bit 3.10-3.13 (Whisper/onnxruntime bunlari destekliyor) ---
 set "PY="
-where py >nul 2>nul && py -3 -c "import sys" >nul 2>nul && set "PY=py -3"
-if not defined PY (
-  where python >nul 2>nul && python -c "import sys" >nul 2>nul && set "PY=python"
+set "CHECK=import sys,struct; sys.exit(0 if (3,10)<=sys.version_info[:2]<=(3,13) and struct.calcsize('P')==8 else 1)"
+where py >nul 2>nul
+if not errorlevel 1 (
+  for %%V in (3.12 3.11 3.13 3.10) do (
+    if not defined PY (
+      py -%%V -c "%CHECK%" >nul 2>nul && set "PY=py -%%V"
+    )
+  )
 )
 if not defined PY (
-  echo [HATA] Python bulunamadi.
-  echo 1. https://www.python.org/downloads/ adresinden Python 3.12 indirin.
+  where python >nul 2>nul && python -c "%CHECK%" >nul 2>nul && set "PY=python"
+)
+if not defined PY (
+  echo [HATA] Uyumlu Python bulunamadi.
+  echo KickClip icin 64-bit Python 3.10 - 3.13 gerekli. 3.14 ve 32-bit surumler desteklenmiyor.
+  echo 1. https://www.python.org/downloads/release/python-3129/ adresinden
+  echo    "Windows installer 64-bit" indirin.
   echo 2. Kurulumun ILK ekraninda "Add python.exe to PATH" kutusunu isaretleyin.
-  echo 3. Kurulum bitince bu pencereyi kapatip baslat.bat'i tekrar calistirin.
+  echo 3. Kurulum bitince baslat.bat'i tekrar calistirin.
   goto :fail
 )
-%PY% -c "import sys; sys.exit(0 if sys.version_info[:2] >= (3, 10) else 1)"
-if errorlevel 1 (
-  echo [HATA] Python surumu cok eski. En az Python 3.10 gerekli, 3.12 onerilir.
-  %PY% --version
-  goto :fail
-)
-for /f "delims=" %%v in ('%PY% --version 2^>^&1') do echo [OK] %%v bulundu.
+for /f "delims=" %%v in ('%PY% --version 2^>^&1') do echo [OK] %%v kullanilacak.
 
 rem --- Sanal ortam ---
 set "VPY=%~dp0.venv\Scripts\python.exe"
+if exist "%VPY%" (
+  "%VPY%" -c "%CHECK%" >nul 2>nul
+  if errorlevel 1 (
+    echo [!] Eski sanal ortam uyumsuz Python ile kurulmus, yeniden olusturuluyor...
+    rmdir /s /q .venv
+  )
+)
 if not exist "%VPY%" (
   echo [1/4] Sanal ortam olusturuluyor...
   %PY% -m venv .venv
