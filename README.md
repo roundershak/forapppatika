@@ -233,6 +233,15 @@ Canlı yayında akış henüz bitmediği için belirtilen süre (`--live-minutes
 
 Hızlandırmak için: `--range` ile aralık seç, `--model base`, `--candidates 15`.
 
+## Ekran kartı (NVIDIA)
+
+NVIDIA kartın varsa `baslat.bat` bunu görür ve ilk açılışta Whisper'ın ekran kartında çalışması için gereken CUDA
+kütüphanelerini kurar (~1.5 GB, bir kez). Ayrıca 4K render ekran kartının video kodlayıcısıyla (NVENC) yapılır.
+Arayüzün sağındaki bilgi kutusunda **🎮** satırı neyin kullanıldığını gösterir:
+`🎮 NVIDIA GeForce RTX ... · Whisper GPU'da ✓ · video kodlama GPU'da ✓`.
+Bir şey çalışmazsa program çökmez, o kısım işlemciyle devam eder. AMD/Intel kartlarda Whisper işlemcide çalışır.
+Ekran kartı sürücün güncel olmalı (NVIDIA sürücüsü 550+ önerilir).
+
 ## Sorun giderme
 
 - **Kick linki indirilmiyor (403 / Cloudflare):** `pip install -U "yt-dlp[default,curl-cffi]"` ile yt-dlp'yi güncelle.

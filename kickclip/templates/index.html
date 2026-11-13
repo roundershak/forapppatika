@@ -392,7 +392,8 @@ async function ytInfo(){
   }
   if (s.connect.status === 'error') yt += `<br><span class="err">❌ ${esc(s.connect.error)}</span>`;
   const ai = s.claude_titles ? '✨ Klip seçimi ve başlıklar <b>Claude</b> ile' : 'ℹ️ Daha iyi seçim/başlık için <b>.env</b> dosyasına <b>ANTHROPIC_API_KEY</b> yaz';
-  $('#ytinfo').innerHTML = yt + '<br>' + ai;
+  $('#ytinfo').innerHTML = yt + '<br>' + ai + '<br><span id="gpuinfo">🎮 Ekran kartı kontrol ediliyor...</span>';
+  gpuInfo();
   const on = $('#yton'), off = $('#ytoff');
   if (on) on.onclick = openYt;
   if (off) off.onclick = async () => { if (confirm('YouTube bağlantısı kesilsin mi?')) { await fetch('/api/youtube/disconnect', {method:'POST'}); ytInfo(); } };
@@ -595,6 +596,18 @@ async function loadSections(){
     running = running || busy;
   }
   return running;
+}
+
+let gpuCache = null;
+async function gpuInfo(){
+  try { if (!gpuCache) gpuCache = await (await fetch('/api/system')).json(); } catch(e) { return; }
+  const g = gpuCache, el = $('#gpuinfo'); if (!el) return;
+  const wd = g.whisper_device ? (g.whisper_device === 'cuda' ? 'Whisper <b>GPU</b>\'da ✓' : 'Whisper işlemcide')
+                              : (g.cuda_devices > 0 ? 'Whisper GPU\'da çalışacak' : 'Whisper işlemcide çalışacak');
+  el.innerHTML = g.nvidia
+    ? `🎮 <b>${esc(g.nvidia)}</b> · ${wd} · video kodlama ${g.nvenc ? '<b>GPU</b>\'da ✓' : 'işlemcide'}`
+      + (g.cuda_devices === 0 ? ' <span class="err">(CUDA kütüphaneleri eksik: baslat.bat\'i yeniden çalıştır)</span>' : '')
+    : '🎮 NVIDIA ekran kartı bulunamadı · her şey işlemcide çalışır (yavaş olabilir)';
 }
 
 // ------------------------------------------------------------ uygulama güncelleme

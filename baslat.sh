@@ -9,6 +9,10 @@ if ! cmp -s requirements.txt .venv/req.stamp; then
   .venv/bin/python -m pip install -r requirements.txt || exit 1
   cp requirements.txt .venv/req.stamp
 fi
+if command -v nvidia-smi >/dev/null && ! cmp -s requirements-gpu.txt .venv/gpu.stamp; then
+  echo "NVIDIA ekran kartı bulundu, CUDA kütüphaneleri kuruluyor (~1.5 GB, tek sefer)..."
+  .venv/bin/python -m pip install -r requirements-gpu.txt && cp requirements-gpu.txt .venv/gpu.stamp
+fi
 export KICKCLIP_LAUNCHER=2
 # döngü tek parça okunur; uygulama içi güncelleme (çıkış kodu 3) sonrası yeni kodla yeniden açılır
 main() {

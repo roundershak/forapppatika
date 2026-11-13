@@ -57,21 +57,37 @@ class Transcriber:
         if self._model is None:
             _quiet_hf()
             from faster_whisper import WhisperModel
+            from . import gpu
+            gpu.add_cuda_dll_dirs()
             device = self.device
             if device == "auto":
+                device = "cuda" if gpu.cuda_devices() > 0 else "cpu"
+            self.log(f"Whisper modeli yükleniyor: {self.model_name} ({'ekran kartı' if device == 'cuda' else 'işlemci'}). "
+                     f"İlk seferde internetten indirilir (small ≈ 480 MB, sadece bir kez).")
+            tried = [device] + (["cpu"] if device == "cuda" else [])
+            last = None
+            for dev in tried:
                 try:
-                    import ctranslate2
-                    device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
-                except Exception:
-                    device = "cpu"
-            compute = "float16" if device == "cuda" else "int8"
-            self.log(f"Whisper modeli yükleniyor: {self.model_name} ({device}). İlk seferde internetten indirilir "
-                     f"(small ≈ 480 MB, birkaç dakika sürebilir; sadece bir kez).")
-            try:
-                self._model = WhisperModel(self.model_name, device=device, compute_type=compute,
-                                           cpu_threads=os.cpu_count() or 4)
-            except Exception as e:
-                self._error = RuntimeError(f"Whisper modeli yüklenemedi: {e}")
+                    model = WhisperModel(self.model_name, device=dev,
+                                         compute_type="float16" if dev == "cuda" else "int8",
+                                         cpu_threads=os.cpu_count() or 4)
+                    if dev == "cuda":
+                        # CUDA kütüphaneleri eksikse hata ilk çözümlemede çıkar: 1 sn sessizlikle dene
+                        import numpy as np
+                        list(model.transcribe(np.zeros(16000, dtype=np.float32), language="tr")[0])
+                    self._model = model
+                    gpu.WHISPER_STATE.update(device=dev, error=None)
+                    if dev == "cuda":
+                        self.log("Whisper ekran kartında çalışıyor ✓")
+                    break
+                except Exception as e:
+                    last = e
+                    if dev == "cuda":
+                        gpu.WHISPER_STATE["error"] = str(e)[:300]
+                        self.log(f"Ekran kartı Whisper için kullanılamadı ({str(e)[:160]}); işlemciye geçiliyor. "
+                                 f"baslat.bat'i yeniden çalıştırmak CUDA kütüphanelerini kurar.")
+            if self._model is None:
+                self._error = RuntimeError(f"Whisper modeli yüklenemedi: {last}")
                 raise self._error
         return self._model
 

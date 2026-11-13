@@ -7,6 +7,7 @@ from typing import Optional
 
 from .config import ClipConfig
 from .layout import Rect
+from .gpu import video_encoder_args
 from .utils import run
 
 
@@ -128,11 +129,12 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
         cmd += ["-i", os.path.abspath(bell)]
     cmd += ["-filter_complex_script", os.path.basename(graph_file),
             "-map", vlabel, "-map", alabel,
-            "-c:v", "libx264", "-preset", cfg.preset, "-crf", str(cfg.crf - 2 if cfg.out_size()[1] > 1920 else cfg.crf),
-            "-profile:v", "high", "-pix_fmt", "yuv420p", "-r", str(cfg.fps),
-            # YouTube önerisi: kapalı GOP = kare hızının yarısı, 2 B-kare; 4K30 için seviye 5.1
+            # ekran kartı (NVENC) varsa onunla, yoksa libx264
+            *video_encoder_args(cfg.crf - 2 if cfg.out_size()[1] > 1920 else cfg.crf, cfg.preset,
+                                "5.1" if cfg.out_size()[1] > 1920 else None),
+            "-pix_fmt", "yuv420p", "-r", str(cfg.fps),
+            # YouTube önerisi: kapalı GOP = kare hızının yarısı, 2 B-kare
             "-g", str(max(1, cfg.fps // 2)), "-bf", "2", "-flags", "+cgop",
-            *(["-level:v", "5.1"] if cfg.out_size()[1] > 1920 else []),
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-t", f"{duration:.3f}", "-movflags", "+faststart",
             os.path.abspath(out_path)]
@@ -144,6 +146,15 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
             break
         except RuntimeError as e:
             last_err = e
+            if "nvenc" in " ".join(cmd) and ("nvenc" in str(e).lower() or "encoder" in str(e).lower()):
+                # ekran kartı kodlayıcısı başarısız -> bu oturumda işlemciyle devam
+                os.environ["KICKCLIP_NO_NVENC"] = "1"
+                from . import gpu
+                gpu.nvenc_ok.cache_clear()
+                cmd = [a for a in cmd]
+                i = cmd.index("h264_nvenc") - 1
+                j = cmd.index("-pix_fmt")
+                cmd[i:j] = video_encoder_args(cfg.crf, cfg.preset, None)
     if last_err:
         raise last_err
     try:

@@ -75,6 +75,24 @@ if errorlevel 1 (
   echo [2/4] Paketler zaten kurulu.
 )
 
+rem --- NVIDIA ekran karti: Whisper'in GPU'da calismasi icin CUDA kutuphaneleri ---
+where nvidia-smi >nul 2>nul
+if not errorlevel 1 (
+  fc /b requirements-gpu.txt ".venv\gpu.stamp" >nul 2>nul
+  if errorlevel 1 (
+    echo [+] NVIDIA ekran karti bulundu. Whisper ekran kartinda calissin diye CUDA kutuphaneleri kuruluyor.
+    echo     Yaklasik 1.5 GB, sadece ilk seferde. Bekleyin...
+    "%VPY%" -m pip install -r requirements-gpu.txt
+    if errorlevel 1 (
+      echo [!] CUDA kutuphaneleri kurulamadi, Whisper islemcide calisacak.
+    ) else (
+      copy /y requirements-gpu.txt ".venv\gpu.stamp" >nul
+    )
+  ) else (
+    echo [OK] NVIDIA ekran karti ve CUDA kutuphaneleri hazir.
+  )
+)
+
 rem --- ffmpeg ---
 where ffmpeg >nul 2>nul
 if errorlevel 1 (

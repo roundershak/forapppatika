@@ -408,6 +408,12 @@ def update_apply():
     return jsonify(ok=True)
 
 
+@app.get("/api/system")
+def system_status():
+    from . import gpu
+    return jsonify(gpu.status())
+
+
 @app.get("/api/youtube/status")
 def yt_status():
     return jsonify(client_secret=youtube.has_client_secret(), authorized=youtube.is_authorized(),
