@@ -44,6 +44,10 @@ class ClipConfig:
     highlight_color: str = "#FFE600"    # konuşulan kelimenin rengi
     sub_position: float = 0.40          # altyazının dikey konumu (0=üst, 1=alt); varsayılan panel sınırı
 
+    # --- YouTube başlığı ---
+    titles: bool = True                 # her klip için Shorts başlığı/açıklaması üret
+    streamer: Optional[str] = None      # hashtag'ler için yayıncı adı (boşsa linkten alınır)
+
     # --- Giriş efekti: zil + blur ---
     intro: bool = True
     intro_hold: float = 0.45            # klip başında ne kadar bulanık kalsın (sn)

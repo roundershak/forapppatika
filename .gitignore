@@ -7,3 +7,5 @@ output/
 *.mp4
 *.ts
 *.part
+client_secret*.json
+youtube_token.json

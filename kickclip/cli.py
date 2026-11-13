@@ -3,6 +3,7 @@
 Örnek:
     python -m kickclip https://kick.com/kanal/videos/xxxx --count 8 --length 30
     python -m kickclip web            # web arayüzünü başlatır
+    python -m kickclip upload output/.../klip_01.mp4 --privacy public
 """
 
 from __future__ import annotations
@@ -47,6 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--color", default=d.highlight_color, help="vurgulanan kelime rengi")
     s.add_argument("--sub-pos", type=float, default=d.sub_position, help="altyazı konumu 0-1")
 
+    t = p.add_argument_group("youtube başlığı")
+    t.add_argument("--no-titles", action="store_true", help="Shorts başlığı üretme")
+    t.add_argument("--streamer", default=None, help="hashtag'ler için yayıncı adı")
+
     i = p.add_argument_group("giriş efekti")
     i.add_argument("--no-intro", action="store_true", help="zil + blur girişini kapat")
     i.add_argument("--bell", default=None, help="kendi zil sesi dosyan")
@@ -70,13 +75,56 @@ def args_to_config(a: argparse.Namespace) -> ClipConfig:
         screen=a.screen, screen_zoom=a.screen_zoom, subtitles=not a.no_subs, whisper_model=a.model,
         language=None if (a.lang or "").lower() in ("", "auto") else a.lang, device=a.device,
         font=a.font, font_size=a.font_size, words_per_line=a.words, highlight_color=a.color,
-        sub_position=a.sub_pos, intro=not a.no_intro, bell_file=a.bell, bell_volume=a.bell_volume,
+        sub_position=a.sub_pos, titles=not a.no_titles, streamer=a.streamer, intro=not a.no_intro, bell_file=a.bell, bell_volume=a.bell_volume,
         intro_hold=a.hold, intro_fade=a.fade, blur_strength=a.blur, crf=a.crf, preset=a.preset, fps=a.fps,
     )
 
 
+def upload_main(argv: list[str]) -> None:
+    """python -m kickclip upload <klip.mp4 | klip.json | klasör> ... [--privacy] [--at]"""
+    import glob
+    import json
+    import os
+
+    from .youtube import upload_short
+
+    p = argparse.ArgumentParser(prog="kickclip upload", description="Klipleri YouTube Shorts olarak yükle")
+    p.add_argument("paths", nargs="+", help="klip .mp4/.json dosyaları veya klip klasörü (yüklenmemiş hepsi)")
+    p.add_argument("--privacy", default="public", choices=["public", "unlisted", "private"])
+    p.add_argument("--at", default=None, help="zamanlanmış yayın, ör. 2026-11-20T18:00:00+03:00")
+    p.add_argument("--title", default=None, help="başlığı geçersiz kıl (tek klipte)")
+    p.add_argument("--force", action="store_true", help="daha önce yüklenmişleri de yükle")
+    a = p.parse_args(argv)
+
+    jsons: list[str] = []
+    for path in a.paths:
+        if os.path.isdir(path):
+            jsons += sorted(glob.glob(os.path.join(path, "klip_*.json")))
+        else:
+            jsons.append(os.path.splitext(path)[0] + ".json")
+    for jp in jsons:
+        with open(jp, encoding="utf-8") as f:
+            meta = json.load(f)
+        if meta.get("youtube") and not a.force:
+            print(f"Atlandı (zaten yüklü): {meta['name']} -> {meta['youtube']['url']}")
+            continue
+        title = a.title or meta.get("title") or meta.get("name")
+        res = upload_short(os.path.splitext(jp)[0] + ".mp4", title, meta.get("description", ""),
+                           meta.get("tags", []), a.privacy, a.at)
+        meta["youtube"] = res
+        with open(jp, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "upload":
+        try:
+            upload_main(argv[1:])
+        except Exception as e:
+            print(f"HATA: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
     if argv and argv[0] == "web":
         from .web import serve
         port = int(argv[1]) if len(argv) > 1 else 7860
@@ -94,6 +142,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
     for c in clips:
         print(f"  {c['name']}  [{c['start_hms']}]  {c['file']}")
+        if c.get("title"):
+            print(f"      Başlık: {c['title']}")
+    if clips:
+        print("\nYüklemek için: python -m kickclip upload <klip.mp4>  (veya web arayüzü)")
 
 
 if __name__ == "__main__":

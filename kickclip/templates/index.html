@@ -31,13 +31,25 @@
   .status { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; }
   .status b { font-size:14px; }
   pre { background:#0e1115; border:1px solid var(--line); border-radius:8px; padding:10px; height:180px; overflow:auto; font-size:12px; color:#b8c4cf; white-space:pre-wrap; margin:12px 0 0; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-top:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; margin-top:16px; }
   .clip { background:#0e1115; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .clip video { width:100%; aspect-ratio:9/16; display:block; background:#000; }
   .clip .meta { padding:8px 10px; font-size:12px; color:var(--muted); }
   .clip .meta b { color:var(--text); }
   .clip .meta a { color:var(--accent); text-decoration:none; float:right; }
   .clip .tx { margin-top:4px; max-height:3.6em; overflow:hidden; }
+  textarea { width:100%; background:#0b0d10; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; font-size:12px; resize:vertical; }
+  .clip input, .clip select { padding:6px 8px; font-size:13px; }
+  .clip .ttl { font-weight:600; }
+  .clip .cnt { float:right; font-size:11px; color:var(--muted); }
+  .clip .acts { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .clip .acts button { flex:1; margin:0; padding:7px 6px; font-size:12px; }
+  .clip .yt { margin-top:8px; font-size:12px; }
+  .clip .yt a { color:#ff4e45; float:none; }
+  .btn-yt { background:#ff0033 !important; color:#fff !important; }
+  .banner { font-size:12px; color:var(--muted); background:#0e1115; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:12px; }
+  .banner b { color:var(--text); }
+  h2 { font-size:15px; margin:22px 0 0; display:flex; justify-content:space-between; align-items:center; }
   .empty { color:var(--muted); text-align:center; padding:40px 0; }
   .err { color:var(--err); }
 </style>
@@ -89,6 +101,7 @@
 
       <label class="check"><input type="checkbox" name="subtitles" checked> Altyazı ekle</label>
       <label class="check"><input type="checkbox" name="intro" checked> Zil sesi + blur giriş</label>
+      <label class="check"><input type="checkbox" name="titles" checked> YouTube Shorts başlığı üret</label>
 
       <details>
         <summary>Gelişmiş ayarlar</summary>
@@ -111,6 +124,7 @@
           <div><label>Kamera zoom (auto)</label><input name="cam_zoom" type="number" step="0.1" value="{{ d.cam_zoom }}"></div>
           <div><label>Blur süresi (sn)</label><input name="intro_hold" type="number" step="0.05" value="{{ d.intro_hold }}"></div>
         </div>
+        <label>Yayıncı adı (hashtag için, boşsa linkten)</label><input name="streamer" placeholder="ör. jahrein">
         <div class="row">
           <div><label>Zil ses seviyesi</label><input name="bell_volume" type="number" step="0.1" value="{{ d.bell_volume }}"></div>
           <div><label>Canlı kayıt (dk)</label><input name="live_minutes" type="number" value="{{ d.live_minutes|int }}"></div>
@@ -128,39 +142,42 @@
     </div>
     <div class="bar"><div id="pb"></div></div>
     <pre id="log">Link yapıştırıp "Klipleri üret"e bas.</pre>
-    <div class="grid" id="clips"></div>
+    <div class="banner" id="ytinfo"></div>
+    <h2>Klipler <button class="ghost" id="refresh">Yenile</button></h2>
+    <div class="grid" id="clips"><div class="empty">Henüz klip yok.</div></div>
   </section>
 </main>
 <script>
 const $ = s => document.querySelector(s);
 const form = $('#f');
-let current = null, timer = null, shown = 0;
+let current = null, timer = null, shown = -1;
 
 form.cam.addEventListener('change', () => {
   form.cam_custom.style.display = form.cam.value === 'custom' ? 'block' : 'none';
 });
 
 const statusText = {queued:'Sırada', running:'Çalışıyor', done:'Tamamlandı ✓', error:'Hata', cancelled:'Durduruldu'};
+const cards = {};   // key -> element (kullanıcı yazarken yeniden çizilmesin)
 
 form.addEventListener('submit', async e => {
   e.preventDefault();
   const fd = new FormData(form);
   const body = Object.fromEntries(fd.entries());
-  body.subtitles = form.subtitles.checked;
-  body.intro = form.intro.checked;
+  for (const k of ['subtitles','intro','titles']) body[k] = form[k].checked;
   if (body.cam === 'custom') body.cam = body.cam_custom;
   delete body.cam_custom;
   $('#go').disabled = true;
   const r = await fetch('/api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
   const j = await r.json();
   if (!r.ok) { alert(j.error || 'Hata'); $('#go').disabled = false; return; }
-  current = j.id; shown = 0; $('#clips').innerHTML = '';
+  current = j.id;
   poll();
 });
 
 $('#cancel').onclick = () => current && fetch(`/api/jobs/${current}/cancel`, {method:'POST'});
+$('#refresh').onclick = () => loadLibrary();
 
-function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return (s??'').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 async function poll(){
   clearTimeout(timer);
@@ -174,21 +191,121 @@ async function poll(){
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
   log.textContent = j.logs.join('\n');
   if (atBottom) log.scrollTop = log.scrollHeight;
-  for (; shown < j.clips.length; shown++) {
-    const c = j.clips[shown];
-    const el = document.createElement('div');
-    el.className = 'clip';
-    el.innerHTML = `<video controls preload="metadata" ${c.thumb_id?`poster="/files/${c.thumb_id}"`:''} src="/files/${c.video_id}"></video>
-      <div class="meta"><b>${esc(c.name)}</b> · ${esc(c.start_hms)}
-        <a href="/files/${c.video_id}?dl=1">İndir ↓</a>
-        <div class="tx">${esc(c.transcript)}</div></div>`;
-    $('#clips').appendChild(el);
-  }
+  if (j.clips !== shown) { shown = j.clips; loadLibrary(); }
   const running = j.status === 'queued' || j.status === 'running';
   $('#cancel').style.display = running ? '' : 'none';
   $('#go').disabled = running;
-  if (running) timer = setTimeout(poll, 1500);
+  if (running) timer = setTimeout(poll, 1500); else loadLibrary();
 }
+
+async function ytInfo(){
+  const s = await (await fetch('/api/youtube/status')).json();
+  const parts = [];
+  parts.push(s.authorized ? '✅ <b>YouTube bağlı</b>'
+    : s.client_secret ? '🔑 <b>YouTube:</b> ilk yüklemede tarayıcıda Google izni istenecek'
+    : '⚠️ <b>YouTube bağlı değil:</b> proje klasörüne <b>client_secret.json</b> koy (README → YouTube kurulumu)');
+  parts.push(s.claude_titles ? '✨ Başlıklar <b>Claude</b> ile üretiliyor' : 'ℹ️ Daha iyi başlıklar için <b>ANTHROPIC_API_KEY</b> tanımla (şu an basit başlık)');
+  $('#ytinfo').innerHTML = parts.join('<br>');
+}
+
+function ytHtml(c){
+  if (c.upload && c.upload.status === 'running') return `⏳ Yükleniyor... ${esc((c.upload.log||[]).slice(-1)[0]||'')}`;
+  if (c.upload && c.upload.status === 'error') return `<span class="err">❌ ${esc(c.upload.error)}</span>`;
+  if (c.youtube) return `✅ <a href="${esc(c.youtube.url)}" target="_blank">${esc(c.youtube.url)}</a> (${esc(c.youtube.privacy)}${c.youtube.publish_at ? ', ' + esc(c.youtube.publish_at) : ''})`;
+  return '';
+}
+
+function makeCard(c){
+  const el = document.createElement('div');
+  el.className = 'clip';
+  el.innerHTML = `<video controls preload="metadata" ${c.thumb?`poster="${c.thumb}"`:''} src="${c.video}"></video>
+    <div class="meta">
+      <b>${esc(c.name)}</b> · ${esc(c.start_hms)} <a href="${c.video}?dl=1">İndir ↓</a>
+      <label>Başlık <span class="cnt"></span></label>
+      <input class="ttl" maxlength="100" value="${esc(c.title)}">
+      <label>Açıklama</label>
+      <textarea class="desc" rows="3">${esc(c.description)}</textarea>
+      <label>Etiketler (virgülle)</label>
+      <input class="tags" value="${esc((c.tags||[]).join(', '))}">
+      <div class="row" style="margin-top:6px">
+        <select class="priv"><option value="public">Herkese açık</option><option value="unlisted">Liste dışı</option><option value="private">Özel</option></select>
+        <input class="sched" type="datetime-local" title="Zamanla (boş = hemen)">
+      </div>
+      <div class="acts">
+        <button class="ghost re">✨ Yeni başlık</button>
+        <button class="ghost save">Kaydet</button>
+        <button class="up btn-yt">YouTube'a yükle</button>
+      </div>
+      <div class="yt"></div>
+      <details><summary>Konuşma metni</summary><div class="tx" style="max-height:none">${esc(c.transcript)}</div></details>
+    </div>`;
+  const q = s => el.querySelector(s);
+  const count = () => q('.cnt').textContent = `${q('.ttl').value.length}/100`;
+  q('.ttl').addEventListener('input', count); count();
+  const fields = () => ({title:q('.ttl').value, description:q('.desc').value, tags:q('.tags').value});
+  const url = `/api/clips/${encodeURIComponent(c.run)}/${encodeURIComponent(c.name)}`;
+  q('.save').onclick = async () => {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(fields())});
+    q('.save').textContent = r.ok ? 'Kaydedildi ✓' : 'Hata'; setTimeout(() => q('.save').textContent = 'Kaydet', 1500);
+  };
+  q('.re').onclick = async () => {
+    q('.re').disabled = true; q('.re').textContent = 'Üretiliyor...';
+    const r = await fetch(url + '/retitle', {method:'POST'});
+    if (r.ok) { const n = await r.json(); q('.ttl').value = n.title; q('.desc').value = n.description; q('.tags').value = (n.tags||[]).join(', '); count(); }
+    q('.re').disabled = false; q('.re').textContent = '✨ Yeni başlık';
+  };
+  q('.up').onclick = async () => {
+    const sched = q('.sched').value;
+    const body = {...fields(), privacy:q('.priv').value, publish_at: sched ? new Date(sched).toISOString() : ''};
+    if (el._yt && !confirm('Bu klip zaten yüklendi. Tekrar yüklensin mi?')) return;
+    if (el._yt) body.force = true;
+    q('.up').disabled = true;
+    const r = await fetch(url + '/upload', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const j = await r.json();
+    if (!r.ok) { alert(j.error || 'Hata'); q('.up').disabled = false; return; }
+    q('.yt').textContent = '⏳ Yükleniyor...';
+    watchUploads();
+  };
+  return el;
+}
+
+function updateCard(el, c){
+  el._yt = !!c.youtube;
+  el.querySelector('.yt').innerHTML = ytHtml(c);
+  const up = el.querySelector('.up');
+  const running = c.upload && c.upload.status === 'running';
+  up.disabled = running;
+  up.textContent = c.youtube ? 'Tekrar yükle' : "YouTube'a yükle";
+  return running;
+}
+
+let upTimer = null;
+async function loadLibrary(){
+  const list = await (await fetch('/api/library')).json();
+  const grid = $('#clips');
+  if (!list.length) { grid.innerHTML = '<div class="empty">Henüz klip yok.</div>'; return false; }
+  grid.querySelector('.empty')?.remove();
+  let anyRunning = false;
+  let prev = null;
+  for (const c of list) {
+    let el = cards[c.key];
+    if (!el) { el = cards[c.key] = makeCard(c); }
+    if (prev ? prev.nextSibling !== el : grid.firstChild !== el) {
+      prev ? prev.after(el) : grid.prepend(el);
+    }
+    prev = el;
+    anyRunning = updateCard(el, c) || anyRunning;
+  }
+  return anyRunning;
+}
+async function watchUploads(){
+  clearTimeout(upTimer);
+  if (await loadLibrary()) upTimer = setTimeout(watchUploads, 2000);
+  else ytInfo();
+}
+
+ytInfo();
+watchUploads();
 </script>
 </body>
 </html>

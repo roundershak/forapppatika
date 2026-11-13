@@ -15,6 +15,7 @@ from .layout import detect_face_region, resolve_cam_rect, resolve_screen_rect
 from .render import make_thumbnail, render_clip
 from .sfx import get_bell
 from .subtitles import Transcriber, build_ass
+from .titles import generate_title
 from .utils import Logger, default_log, fmt_time, probe, require_ffmpeg, run
 
 ProgressFn = Callable[[float], None]
@@ -36,10 +37,11 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
 
     # 1) Kaynak
     prog(0.02)
-    src, offset = fetch(cfg.source, cfg.work_dir, cfg.max_height, cfg.time_range, cfg.live_minutes, log)
+    src, offset, src_meta = fetch(cfg.source, cfg.work_dir, cfg.max_height, cfg.time_range, cfg.live_minutes, log)
     info = probe(src)
     W, H, dur = info["width"], info["height"], info["duration"]
     log(f"Video: {W}x{H}, süre {fmt_time(dur)}")
+    streamer = cfg.streamer or src_meta.get("uploader") or ""
     prog(0.25)
 
     # 2) Klip aralıkları
@@ -130,7 +132,12 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
             "start_hms": fmt_time(seg.start + offset),
             "score": round(seg.score, 3),
             "transcript": text,
+            "streamer": streamer,
+            "source_title": src_meta.get("title", ""),
         }
+        if cfg.titles:
+            meta.update(generate_title(text, streamer, src_meta.get("title", ""), log))
+            log(f"[{idx}/{n}] Başlık: {meta['title']}")
         with open(os.path.join(run_dir, f"{name}.json"), "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
         results.append(meta)

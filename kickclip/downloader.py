@@ -20,17 +20,17 @@ def _safe_name(s: str) -> str:
 
 
 def fetch(source: str, work_dir: str, max_height: int = 1080, time_range: Optional[str] = None,
-          live_minutes: float = 30.0, log: Logger = default_log) -> tuple[str, float]:
+          live_minutes: float = 30.0, log: Logger = default_log) -> tuple[str, float, dict]:
     """Kaynağı yerel bir video dosyasına dönüştürür.
 
-    Dönüş: (dosya_yolu, zaman_ofseti). Ofset, indirilen dosyanın orijinal yayındaki
+    Dönüş: (dosya_yolu, zaman_ofseti, {"uploader", "title"}). Ofset, indirilen dosyanın orijinal yayındaki
     başlangıç saniyesidir (aralıklı indirmede klip zaman damgalarını doğru göstermek için).
     """
     rng = parse_range(time_range)
     if not is_url(source):
         if not os.path.isfile(source):
             raise FileNotFoundError(f"Dosya bulunamadı: {source}")
-        return os.path.abspath(source), 0.0
+        return os.path.abspath(source), 0.0, {"uploader": "", "title": os.path.splitext(os.path.basename(source))[0]}
 
     import yt_dlp
 
@@ -46,14 +46,15 @@ def fetch(source: str, work_dir: str, max_height: int = 1080, time_range: Option
     uploader = info.get("uploader") or info.get("channel") or ""
     name = _safe_name(f"{uploader}_{title}" if uploader else title)
     log(f"Bulundu: {uploader} - {title}")
+    meta = {"uploader": uploader, "title": title}
 
     if info.get("is_live"):
-        return _record_live(info, work_dir, name, live_minutes, log), 0.0
+        return _record_live(info, work_dir, name, live_minutes, log), 0.0, meta
 
     out_path = os.path.join(work_dir, f"{name}{'_' + time_range.replace(':', '') if rng else ''}.mp4")
     if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
         log(f"Önceden indirilmiş dosya kullanılıyor: {out_path}")
-        return out_path, (rng[0] if rng else 0.0)
+        return out_path, (rng[0] if rng else 0.0), meta
 
     last = {"pct": -10}
 
@@ -100,7 +101,7 @@ def fetch(source: str, work_dir: str, max_height: int = 1080, time_range: Option
         if not cands:
             raise RuntimeError("İndirilen dosya bulunamadı.")
         out_path = os.path.join(work_dir, cands[0])
-    return out_path, (rng[0] if rng else 0.0)
+    return out_path, (rng[0] if rng else 0.0), meta
 
 
 def _record_live(info: dict, work_dir: str, name: str, minutes: float, log: Logger) -> str:
