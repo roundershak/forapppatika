@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .config import ClipConfig
@@ -194,6 +195,12 @@ def main(argv: list[str] | None = None) -> None:
         nums = [a for a in argv[1:] if a.isdigit()]
         serve(port=int(nums[0]) if nums else 7860, open_browser="--open" in argv)
         return
+    known = {"web", "upload", "uzun", "guncelle", "gpu"}
+    if argv and not argv[0].startswith("-") and argv[0] not in known and "/" not in argv[0] \
+            and "\\" not in argv[0] and "." not in argv[0] and not os.path.exists(argv[0]):
+        print(f"HATA: '{argv[0]}' diye bir komut yok. Komutlar: {', '.join(sorted(known))}. "
+              f"Bu komut yeni eklendiyse KickClip'i güncelle (guncelle.bat).", file=sys.stderr)
+        sys.exit(2)
     args = build_parser().parse_args(argv)
     from .pipeline import run_pipeline
     try:

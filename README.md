@@ -70,7 +70,8 @@ Windows'ta `baslat.bat` dosyasına çift tıklaman yeterli. İlk çalıştırmad
 - ffmpeg yoksa `winget` ile kurar (sonra baslat.bat'i bir kez daha çalıştır),
 - arayüzü başlatıp tarayıcıyı açar. Sonraki açılışlar birkaç saniye sürer.
 
-**Güncelleme:** Yeni sürüm çıkınca arayüzün sağ üstünde mavi **⬆ Güncelleme var** butonu çıkar; basınca
+**Güncelleme:** KickClip klasöründeki **`guncelle.bat`**'a çift tıkla: son sürümü GitHub'dan indirir, kişisel
+dosyalarına dokunmadan kodu günceller (silip yeniden indirmene gerek yok). Ayrıca yeni sürüm çıkınca arayüzün sağ üstünde mavi **⬆ Güncelleme var** butonu çıkar; basınca
 uygulama kendini GitHub'dan günceller ve yeniden başlar. Kliplerin, `.env`, `client_secret.json` ve YouTube
 bağlantın korunur. (Komut satırı: `python -m kickclip guncelle`.)
 
