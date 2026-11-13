@@ -93,7 +93,7 @@ def build_filtergraph(cfg: ClipConfig, cam: Optional[Rect], screen_mode: str, sc
     return ";\n".join(parts), "[vout]", "[aout]"
 
 
-def render_clip(cfg: ClipConfig, src: str, start: float, duration: float, out_path: str,
+def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_path: str,
                 cam: Optional[Rect], screen_mode: str, screen: Rect, has_audio: bool,
                 bell: Optional[str], ass_path: Optional[str], fonts_dir: Optional[str]) -> None:
     clip_dir = os.path.dirname(os.path.abspath(ass_path or out_path))
@@ -113,8 +113,10 @@ def render_clip(cfg: ClipConfig, src: str, start: float, duration: float, out_pa
     with open(graph_file, "w", encoding="utf-8") as f:
         f.write(graph)
 
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-           "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", os.path.abspath(src)]
+    # input_args: Source.ff_input(...) -> yerel dosya ya da akış adresi (sadece bu aralık çekilir)
+    input_args = [os.path.abspath(a) if i > 0 and input_args[i - 1] == "-i" and os.path.exists(a) else a
+                  for i, a in enumerate(input_args)]
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *input_args]
     if cfg.intro and bell:
         cmd += ["-i", os.path.abspath(bell)]
     cmd += ["-filter_complex_script", os.path.basename(graph_file),
@@ -124,7 +126,16 @@ def render_clip(cfg: ClipConfig, src: str, start: float, duration: float, out_pa
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
             "-t", f"{duration:.3f}", "-movflags", "+faststart",
             os.path.abspath(out_path)]
-    run(cmd, cwd=clip_dir)
+    last_err = None
+    for attempt in range(3):  # akıştan okurken ağ kopmalarına karşı
+        try:
+            run(cmd, cwd=clip_dir)
+            last_err = None
+            break
+        except RuntimeError as e:
+            last_err = e
+    if last_err:
+        raise last_err
     try:
         os.remove(graph_file)
     except OSError:

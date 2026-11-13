@@ -25,8 +25,11 @@ class Transcriber:
         self.language = language or None
         self.log = log
         self._model = None
+        self._error: Exception | None = None
 
     def _load(self):
+        if self._error is not None:  # bir kez başarısız olduysa her seferinde yeniden denemesin
+            raise self._error
         if self._model is None:
             from faster_whisper import WhisperModel
             device = self.device
@@ -38,7 +41,11 @@ class Transcriber:
                     device = "cpu"
             compute = "float16" if device == "cuda" else "int8"
             self.log(f"Whisper modeli yükleniyor: {self.model_name} ({device}) - ilk seferde indirilir...")
-            self._model = WhisperModel(self.model_name, device=device, compute_type=compute)
+            try:
+                self._model = WhisperModel(self.model_name, device=device, compute_type=compute)
+            except Exception as e:
+                self._error = RuntimeError(f"Whisper modeli yüklenemedi: {e}")
+                raise self._error
         return self._model
 
     def words(self, audio_path: str) -> list[Word]:

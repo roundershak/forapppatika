@@ -38,33 +38,22 @@ def _rect_from_spec(spec: str, W: int, H: int) -> Optional[Rect]:
     return Rect(int(x), int(y), int(w), int(h)).even()
 
 
-def detect_face_region(path: str, duration: float, start: float = 0.0, end: Optional[float] = None,
-                       samples: int = 24, log: Logger = default_log) -> Optional[tuple[float, float, float, float]]:
-    """Videodan örnek kareler alıp sabit duran yüzü (webcam) bulur. (cx, cy, fw, fh) döner."""
+def detect_face_region(frames: list, log: Logger = default_log) -> Optional[tuple[float, float, float, float]]:
+    """Örnek karelerde sabit duran yüzü (webcam) bulur. (cx, cy, fw, fh) döner."""
     try:
         import cv2
     except ImportError:
         log("OpenCV yüklü değil, kamera otomatik bulunamıyor.")
         return None
-
+    frames = [f for f in frames if f is not None]
+    if not frames:
+        return None
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     alt = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt2.xml")
-    cap = cv2.VideoCapture(path)
-    if not cap.isOpened():
-        return None
-    end = end if end is not None else duration
-    span = max(1.0, end - start)
     dets: list[tuple[float, float, float, float]] = []
-    W = H = 0
-    for i in range(samples):
-        t = start + span * (i + 0.5) / samples
-        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000)
-        ok, frame = cap.read()
-        if not ok:
-            continue
-        H, W = frame.shape[:2]
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
+    for frame in frames:
+        H = frame.shape[0]
+        gray = cv2.equalizeHist(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
         min_side = max(24, int(H * 0.04))
         faces = []
         for cc in (cascade, alt):
@@ -73,8 +62,8 @@ def detect_face_region(path: str, duration: float, start: float = 0.0, end: Opti
                 break
         for (x, y, w, h) in faces:
             dets.append((x + w / 2, y + h / 2, float(w), float(h)))
-    cap.release()
-    if not dets or W == 0:
+    samples = len(frames)
+    if not dets:
         return None
 
     # Kümeleme: webcam sabit durduğu için en çok tekrar eden konumu al

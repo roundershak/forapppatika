@@ -27,6 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--range", dest="time_range", default=None, help="sadece bu aralık, ör. 1:00:00-2:00:00")
     p.add_argument("--live-minutes", type=float, default=d.live_minutes, help="canlı yayında kayıt süresi (dk)")
     p.add_argument("--max-height", type=int, default=d.max_height)
+    p.add_argument("--download", choices=["stream", "full"], default=d.download,
+                   help="stream: yayını indirmeden akıştan analiz et, sadece klipleri çek (varsayılan); full: tümünü indir")
+    p.add_argument("--no-ai", action="store_true", help="Whisper+Claude değerlendirmesini kapat (sadece ses analizi)")
+    p.add_argument("--candidates", type=int, default=0, help="AI'ın inceleyeceği aday sayısı (0=otomatik)")
+    p.add_argument("--fixed-length", action="store_true", help="klip süresini sabit tut (AI esnetmesin)")
 
     g = p.add_argument_group("yerleşim")
     g.add_argument("--cam", default=d.cam,
@@ -70,7 +75,8 @@ def build_parser() -> argparse.ArgumentParser:
 def args_to_config(a: argparse.Namespace) -> ClipConfig:
     return ClipConfig(
         source=a.source, output_dir=a.output, work_dir=a.work, max_height=a.max_height,
-        time_range=a.time_range, live_minutes=a.live_minutes, mode=a.mode, clip_length=a.length,
+        time_range=a.time_range, live_minutes=a.live_minutes, download=a.download, ai=not a.no_ai,
+        ai_candidates=a.candidates, flex_length=not a.fixed_length, mode=a.mode, clip_length=a.length,
         max_clips=a.count, cam=a.cam, cam_ratio=a.cam_ratio, cam_size=a.cam_size, cam_zoom=a.cam_zoom,
         screen=a.screen, screen_zoom=a.screen_zoom, subtitles=not a.no_subs, whisper_model=a.model,
         language=None if (a.lang or "").lower() in ("", "auto") else a.lang, device=a.device,

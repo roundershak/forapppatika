@@ -99,6 +99,7 @@
         <option value="fit">Tamamını sığdır (bulanık arka plan)</option>
       </select>
 
+      <label class="check"><input type="checkbox" name="ai" checked> Yapay zekâ ile en iyi anları seç (Whisper + Claude)</label>
       <label class="check"><input type="checkbox" name="subtitles" checked> Altyazı ekle</label>
       <label class="check"><input type="checkbox" name="intro" checked> Zil sesi + blur giriş</label>
       <label class="check"><input type="checkbox" name="titles" checked> YouTube Shorts başlığı üret</label>
@@ -124,6 +125,11 @@
           <div><label>Kamera zoom (auto)</label><input name="cam_zoom" type="number" step="0.1" value="{{ d.cam_zoom }}"></div>
           <div><label>Blur süresi (sn)</label><input name="intro_hold" type="number" step="0.05" value="{{ d.intro_hold }}"></div>
         </div>
+        <label>Kaynak okuma</label>
+        <select name="download">
+          <option value="stream">İndirmeden akıştan analiz et, sadece klipleri çek</option>
+          <option value="full">Önce tüm yayını indir</option>
+        </select>
         <label>Yayıncı adı (hashtag için, boşsa linkten)</label><input name="streamer" placeholder="ör. jahrein">
         <div class="row">
           <div><label>Zil ses seviyesi</label><input name="bell_volume" type="number" step="0.1" value="{{ d.bell_volume }}"></div>
@@ -163,7 +169,7 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   const fd = new FormData(form);
   const body = Object.fromEntries(fd.entries());
-  for (const k of ['subtitles','intro','titles']) body[k] = form[k].checked;
+  for (const k of ['subtitles','intro','titles','ai']) body[k] = form[k].checked;
   if (body.cam === 'custom') body.cam = body.cam_custom;
   delete body.cam_custom;
   $('#go').disabled = true;
@@ -221,6 +227,7 @@ function makeCard(c){
   el.innerHTML = `<video controls preload="metadata" ${c.thumb?`poster="${c.thumb}"`:''} src="${c.video}"></video>
     <div class="meta">
       <b>${esc(c.name)}</b> · ${esc(c.start_hms)} <a href="${c.video}?dl=1">İndir ↓</a>
+      ${c.reason ? `<div class="tx">🤖 ${c.category ? '<b>' + esc(c.category) + '</b> · ' : ''}${esc(c.reason)}</div>` : ''}
       <label>Başlık <span class="cnt"></span></label>
       <input class="ttl" maxlength="100" value="${esc(c.title)}">
       <label>Açıklama</label>

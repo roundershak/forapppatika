@@ -15,12 +15,17 @@ class ClipConfig:
     max_height: int = 1080              # indirilecek en yüksek çözünürlük
     time_range: Optional[str] = None    # "01:00:00-02:30:00" gibi; sadece bu aralığı indir/işle
     live_minutes: float = 30.0          # canlı yayında kaç dakika kaydedilecek
+    download: str = "stream"            # stream: indirmeden akıştan oku, sadece klipleri çek | full: tümünü indir
 
     # --- Klip seçimi ---
     mode: str = "highlights"            # "highlights" (en hareketli anlar) | "split" (sırayla parçala)
     clip_length: float = 30.0           # saniye
     max_clips: int = 10
     lead_ratio: float = 0.65            # highlight anı klibin yüzde kaçında olsun (öncesindeki gerilim)
+    ai: bool = True                     # adayları Whisper + Claude ile değerlendir
+    ai_candidates: int = 0              # değerlendirilecek aday sayısı (0 = klip sayısı x 2.5)
+    ai_window: float = 0.0              # aday başına incelenen pencere (sn, 0 = klip süresi x 2, en az 45)
+    flex_length: bool = True            # AI klip süresini ±%50 esnetebilsin (olayın tamamını almak için)
 
     # --- Yerleşim (1080x1920) ---
     width: int = 1080

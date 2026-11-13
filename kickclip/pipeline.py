@@ -1,4 +1,10 @@
-"""Uçtan uca akış: indir -> analiz et -> kamera bul -> altyazı -> render."""
+"""Uçtan uca akış.
+
+1) Kaynak çözülür (Kick linkiyse indirilmez; akış adresi alınır)
+2) Tüm yayının sesi paralel taranır -> tepki adayları (bağırma, gülme ritmi, ani heyecan)
+3) Adaylar Whisper ile yazıya dökülür, Claude en iyilerini seçip sınırlarını belirler
+4) Kamera yeri bulunur, sadece seçilen aralıklar yüksek kalitede çekilip 9:16 render edilir
+"""
 
 from __future__ import annotations
 
@@ -8,15 +14,16 @@ import re
 import time
 from typing import Callable, Optional
 
+from .ai import rank
 from .config import ClipConfig
-from .downloader import fetch
-from .highlights import Segment, find_highlights, split_segments
+from .highlights import Segment, analyze, find_candidates, split_segments
 from .layout import detect_face_region, resolve_cam_rect, resolve_screen_rect
 from .render import make_thumbnail, render_clip
 from .sfx import get_bell
+from .source import resolve
 from .subtitles import Transcriber, build_ass
 from .titles import generate_title
-from .utils import Logger, default_log, fmt_time, probe, require_ffmpeg, run
+from .utils import Logger, default_log, fmt_time, require_ffmpeg, run
 
 ProgressFn = Callable[[float], None]
 ClipDoneFn = Callable[[dict], None]
@@ -34,38 +41,70 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
     prog = progress or (lambda p: None)
     os.makedirs(cfg.work_dir, exist_ok=True)
     os.makedirs(cfg.output_dir, exist_ok=True)
+    t_begin = time.time()
 
     # 1) Kaynak
     prog(0.02)
-    src, offset, src_meta = fetch(cfg.source, cfg.work_dir, cfg.max_height, cfg.time_range, cfg.live_minutes, log)
-    info = probe(src)
-    W, H, dur = info["width"], info["height"], info["duration"]
-    log(f"Video: {W}x{H}, süre {fmt_time(dur)}")
-    streamer = cfg.streamer or src_meta.get("uploader") or ""
+    src = resolve(cfg.source, cfg.work_dir, cfg.max_height, cfg.time_range, cfg.live_minutes, cfg.download, log)
+    span = src.end - src.start
+    log(f"İşlenecek süre: {fmt_time(span)}")
+    streamer = cfg.streamer or src.uploader or ""
+    disp = lambda t: t + src.display_offset  # noqa: E731
+    prog(0.08)
+
+    # 2) Ses taraması + aday anlar
+    clip_len = min(cfg.clip_length, span)
+    t0 = time.time()
+    feats = analyze(src, log) if src.has_audio else None
+    if feats is not None:
+        log(f"Ses taraması {time.time() - t0:.0f} sn sürdü.")
     prog(0.25)
 
-    # 2) Klip aralıkları
-    clip_len = min(cfg.clip_length, dur)
-    if not info["has_audio"]:
+    transcriber = Transcriber(cfg.whisper_model, cfg.device, cfg.language, log) \
+        if (cfg.subtitles or cfg.ai) and src.has_audio else None
+
+    if feats is None:
         log("Videoda ses yok; sırayla bölme moduna geçiliyor.")
-        segs = [Segment(t, min(dur, t + clip_len)) for t in
-                [i * clip_len for i in range(int(dur // clip_len) or 1)]][: cfg.max_clips]
+        segs = split_segments(None, src.start, src.end, clip_len, cfg.max_clips, log)
     elif cfg.mode == "split":
-        segs = split_segments(src, dur, clip_len, cfg.max_clips, log)
+        segs = split_segments(feats, src.start, src.end, clip_len, cfg.max_clips, log)
     else:
-        segs = find_highlights(src, dur, clip_len, cfg.max_clips, cfg.lead_ratio, log)
+        k = cfg.ai_candidates or max(cfg.max_clips + 3, int(cfg.max_clips * 2.5))
+        k = k if cfg.ai else cfg.max_clips
+        cands = find_candidates(feats, clip_len, k, cfg.lead_ratio, src.start, src.end, log)
+        if cfg.ai:
+            window = cfg.ai_window or max(45.0, clip_len * 2)
+            t0 = time.time()
+            segs = rank(src, cands, cfg.max_clips, clip_len, cfg.lead_ratio,
+                        transcriber if cfg.ai else None, window, cfg.flex_length, log, should_stop)
+            log(f"Yapay zekâ seçimi {time.time() - t0:.0f} sn sürdü.")
+        else:
+            segs = cands[: cfg.max_clips]
     if not segs:
         raise RuntimeError("Hiç klip aralığı bulunamadı.")
-    prog(0.32)
+    for i, s in enumerate(segs, 1):
+        log(f"  #{i} {fmt_time(disp(s.start))} ({s.duration:.0f} sn) {s.category + ': ' if s.category else ''}{s.reason}")
+    prog(0.45)
 
-    # 3) Yerleşim
+    # 3) Yerleşim: seçilen kliplerden kare örnekleyip kamerayı bul
+    log("Kareler örnekleniyor...")
+    times = []
+    for s in segs[:8]:
+        times += [s.start + s.duration * f for f in (0.25, 0.6)]
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        frames = [f for f in ex.map(src.grab_frame, times) if f is not None]
+    if not frames:
+        raise RuntimeError("Videodan kare alınamadı.")
+    H, W = frames[0].shape[:2]
+    log(f"Video çözünürlüğü: {W}x{H}")
     top_h = round(cfg.height * cfg.cam_ratio / 2) * 2
     top_aspect = cfg.width / top_h
     bot_aspect = cfg.width / (cfg.height - top_h)
     face = None
     if cfg.cam.strip().lower() == "auto":
         log("Yayıncı kamerası aranıyor...")
-        face = detect_face_region(src, dur, log=log)
+        face = detect_face_region(frames, log=log)
         if face is None:
             log("Kamera bulunamadı -> tam ekran (bulanık arka planlı) düzen kullanılacak. "
                 "Elle ayarlamak için kamera konumunu seçin (ör. top-left / x,y,w,h).")
@@ -78,14 +117,13 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
     sub_pos = cfg.sub_position if cam else max(cfg.sub_position, 0.70)
 
     bell = get_bell(cfg.bell_file, cfg.work_dir) if cfg.intro else None
-    transcriber = Transcriber(cfg.whisper_model, cfg.device, cfg.language, log) if cfg.subtitles else None
     fonts_dir = os.path.join(ROOT, "assets", "fonts")
 
-    base = _slug(os.path.splitext(os.path.basename(src))[0])
-    run_dir = os.path.join(cfg.output_dir, f"{base}_{time.strftime('%Y%m%d_%H%M%S')}")
+    run_dir = os.path.join(cfg.output_dir, f"{_slug(src.name)}_{time.strftime('%Y%m%d_%H%M%S')}")
     tmp_dir = os.path.join(run_dir, "_tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
+    # 4) Klipler
     results: list[dict] = []
     n = len(segs)
     for idx, seg in enumerate(segs, 1):
@@ -93,30 +131,31 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
             log("Durduruldu.")
             break
         name = f"klip_{idx:02d}"
-        log(f"[{idx}/{n}] {name}: {fmt_time(seg.start + offset)} - {fmt_time(seg.end + offset)}")
+        log(f"[{idx}/{n}] {name}: {fmt_time(disp(seg.start))} - {fmt_time(disp(seg.end))}")
         out_mp4 = os.path.join(run_dir, f"{name}.mp4")
-        ass_path = None
-        text = ""
-        if transcriber and info["has_audio"]:
+        words = [w for w in seg.words if w.end > seg.start and w.start < seg.end]
+        if cfg.subtitles and transcriber and not seg.words:
             wav = os.path.join(tmp_dir, f"{name}.wav")
-            run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{seg.start:.3f}", "-t", f"{seg.duration:.3f}",
-                 "-i", src, "-vn", "-ac", "1", "-ar", "16000", wav])
             try:
-                words = transcriber.words(wav)
-            except Exception as e:  # altyazı başarısız olsa da klip üretilsin
+                run(["ffmpeg", "-y", "-loglevel", "error", *src.ff_input("analysis", seg.start, seg.duration),
+                     "-vn", "-ac", "1", "-ar", "16000", wav])
+                from .subtitles import Word
+                words = [Word(w.start + seg.start, w.end + seg.start, w.text) for w in transcriber.words(wav)]
+            except Exception as e:
                 log(f"Altyazı oluşturulamadı: {e}")
                 words = []
-            text = " ".join(w.text for w in words)
-            if words:
-                ass_path = build_ass(words, os.path.join(tmp_dir, f"{name}.ass"), cfg.width, cfg.height,
-                                     cfg.font, cfg.font_size, cfg.words_per_line, cfg.uppercase,
-                                     cfg.highlight_color, sub_pos)
-            else:
-                log("Konuşma bulunamadı, altyazısız devam.")
+        text = " ".join(w.text for w in words)
+        ass_path = None
+        if cfg.subtitles and words:
+            from .subtitles import Word
+            rel = [Word(w.start - seg.start, w.end - seg.start, w.text) for w in words]
+            ass_path = build_ass(rel, os.path.join(tmp_dir, f"{name}.ass"), cfg.width, cfg.height,
+                                 cfg.font, cfg.font_size, cfg.words_per_line, cfg.uppercase,
+                                 cfg.highlight_color, sub_pos)
 
-        log(f"[{idx}/{n}] Render ediliyor...")
-        render_clip(cfg, src, seg.start, seg.duration, out_mp4, cam, screen_mode, screen,
-                    info["has_audio"], bell, ass_path, fonts_dir)
+        log(f"[{idx}/{n}] Render ediliyor (sadece bu {seg.duration:.0f} sn çekiliyor)...")
+        render_clip(cfg, src.ff_input("media", seg.start, seg.duration), seg.duration, out_mp4, cam,
+                    screen_mode, screen, src.has_audio, bell, ass_path, fonts_dir)
         thumb = os.path.join(run_dir, f"{name}.jpg")
         try:
             make_thumbnail(out_mp4, thumb, min(seg.duration / 2, cfg.intro_hold + 1.0))
@@ -127,23 +166,26 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
             "name": name,
             "file": os.path.abspath(out_mp4),
             "thumbnail": os.path.abspath(thumb) if thumb else None,
-            "start": round(seg.start + offset, 2),
-            "end": round(seg.end + offset, 2),
-            "start_hms": fmt_time(seg.start + offset),
+            "start": round(disp(seg.start), 2),
+            "end": round(disp(seg.end), 2),
+            "start_hms": fmt_time(disp(seg.start)),
             "score": round(seg.score, 3),
+            "category": seg.category,
+            "reason": seg.reason,
             "transcript": text,
             "streamer": streamer,
-            "source_title": src_meta.get("title", ""),
+            "source_title": src.title,
+            "source_url": cfg.source,
         }
         if cfg.titles:
-            meta.update(generate_title(text, streamer, src_meta.get("title", ""), log))
+            meta.update(generate_title(text, streamer, src.title, log))
             log(f"[{idx}/{n}] Başlık: {meta['title']}")
         with open(os.path.join(run_dir, f"{name}.json"), "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
         results.append(meta)
         if on_clip:
             on_clip(meta)
-        prog(0.35 + 0.65 * idx / n)
+        prog(0.45 + 0.55 * idx / n)
 
     with open(os.path.join(run_dir, "klipler.json"), "w", encoding="utf-8") as f:
         json.dump({"source": cfg.source, "config": cfg.to_dict(), "clips": results}, f, ensure_ascii=False, indent=2)
@@ -156,6 +198,6 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         os.rmdir(tmp_dir)
     except OSError:
         pass
-    log(f"Bitti! {len(results)} klip -> {os.path.abspath(run_dir)}")
+    log(f"Bitti! {len(results)} klip, toplam {fmt_time(time.time() - t_begin)} -> {os.path.abspath(run_dir)}")
     prog(1.0)
     return results

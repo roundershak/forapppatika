@@ -5,8 +5,10 @@ Kick yayın linkini ver, uygulama yayını parçalara bölüp **TikTok / Shorts 
 - **Üstte yayıncı kamerası**, **altta ekran / oyun** (önemli içerik)
 - **Otomatik altyazı** (Whisper, Türkçe destekli, konuşulan kelime sarı vurgulu, TikTok tarzı)
 - **Giriş efekti:** klip bulanık başlar, **zil sesiyle birlikte blur kalkar**
-- **En hareketli anları bulma:** ses analiziyle yayıncının bağırdığı/güldüğü, ortamın coştuğu anlar seçilir
+- **Yapay zekâ ile en iyi anları bulma:** ses analiziyle yayıncının güldüğü/bağırdığı/tepki verdiği aday anlar bulunur,
+  Whisper + Claude bunları dinleyip gerçekten klip olacakları seçer ve sınırlarını belirler
   (ya da yayını sırayla eşit parçalara bölme modu)
+- **İndirme yok:** yayın Kick'in akışından okunur, sadece seçilen klipler çekilir
 - Kick **canlı yayın**, **VOD** ve **klip** linkleri + yerel video dosyaları desteklenir
 - **Otomatik YouTube Shorts başlığı + açıklama + etiket** (konuşmaya göre; Claude ile ya da API anahtarı olmadan basit modda)
 - İstediğin klibi arayüzden **tek tıkla YouTube Shorts'a yükleme** (herkese açık / liste dışı / özel, ileri tarihe zamanlama)
@@ -103,6 +105,10 @@ arayüzde kartın altında görünür, düzenleyebilir ya da **✨ Yeni başlık
 
 | Ayar | Açıklama |
 |---|---|
+| `--no-ai` | Whisper+Claude seçimini kapat, sadece ses analizi |
+| `--candidates 20` | AI'ın inceleyeceği aday sayısı |
+| `--fixed-length` | Klip süresi sabit kalsın (AI ±%50 esnetmesin) |
+| `--download full` | Önce tüm yayını indir (akıştan okuma sorun çıkarırsa) |
 | `--cam auto` | Yüz tespitiyle webcam'i otomatik bulur. Bulamazsa tam ekran (bulanık arka planlı) düzene geçer. |
 | `--cam top-left` / `top-right` / `bottom-left` / `bottom-right` | Webcam'in köşesi (boyut: `--cam-size`, kaynak genişliğine oran) |
 | `--cam x,y,w,h` | Elle kırpma alanı. Piksel (`1500,700,420,380`) ya da oran (`0.78,0.65,0.22,0.35`) |
@@ -126,12 +132,38 @@ arayüzde kartın altında görünür, düzenleyebilir ya da **✨ Yeni başlık
 
 ## Nasıl çalışır?
 
-1. `yt-dlp` ile Kick yayını indirilir (canlıysa ffmpeg ile belirtilen süre kaydedilir).
-2. Ses enerjisi 0.5 sn'lik pencerelerle analiz edilir; yerel ortalamaya göre ani yükselişler + konuşma
-   yoğunluğu puanlanır, en yüksek puanlı ve birbirinden uzak anlar seçilir.
-3. OpenCV yüz tespitiyle webcam bölgesi bulunur.
-4. Her klip için `faster-whisper` kelime zamanlı transkript çıkarır, ASS altyazı oluşturulur.
-5. ffmpeg tek geçişte: kamera + ekran dikey birleştirme → blur giriş (zil anında kalkar) → altyazı → ses miksajı.
+**Yayını indirmez.** Kick linkini verdiğinde yayın bilgisayarına indirilmez; Kick'in video akışından (HLS) okunur:
+
+1. **Ses taraması (tüm yayın):** Kick'in en düşük kaliteli akışından sadece ses okunur (6 saatlik yayın için
+   birkaç yüz MB; 1080p'nin ~%5'i). Paralel okunur. Her 0.5 saniye için:
+   - konuşma bandındaki (300-3400 Hz) ani yükselme → yayıncı bağırıyor/heyecanlanıyor
+   - 3-8 Hz ritmik dalgalanma → gülme ("ha-ha-ha"), hızlı heyecanlı konuşma
+   - bas ağırlıklı ses (patlama, müzik) ayrıca ayırt edilir, daha düşük puan alır
+   - konuşma yoğunluğu
+   En yüksek puanlı, birbirinden uzak anlar **aday** olur (klip sayısının ~2.5 katı).
+2. **Yapay zekâ seçimi:** Her adayın çevresindeki ~45-60 sn'lik ses çekilir, **Whisper** ile yazıya dökülür.
+   **Claude** tüm adayları okuyup gerçekten klip olacakları (kahkaha, şok, sinir, komik söz, epik an) seçer,
+   puanlar ve klibin başlangıç/bitişini olayın kurulumu + punchline'ı kapsayacak, cümle ortasında kesmeyecek
+   şekilde belirler. Neden seçildiği kartta 🤖 olarak görünür.
+   `ANTHROPIC_API_KEY` yoksa: ses puanı + metindeki tepki işaretleri (hahaha, !, "olamaz", "oha"...) ile seçilir.
+3. **Sadece seçilen klipler** yüksek kaliteli (1080p) akıştan çekilir; OpenCV ile webcam bulunur.
+4. ffmpeg tek geçişte: kamera üstte + ekran altta → blur giriş (zil anında kalkar) → altyazı (Whisper kelimeleri
+   2. adımdan tekrar kullanılır) → ses miksajı.
+5. Her klibe Shorts başlığı/açıklaması üretilir.
+
+Canlı yayında akış henüz bitmediği için belirtilen süre (`--live-minutes`) kaydedilir, sonra aynı adımlar uygulanır.
+`--download full` ile eski yöntem (önce tüm yayını indir) kullanılabilir.
+
+### Ne kadar sürer? (yaklaşık)
+
+| Adım | 6 saatlik yayın |
+|---|---|
+| Ses taraması | internet hızına bağlı, genelde 3-10 dk (yerel dosyada ~1 dk) |
+| Whisper (25 aday × ~50 sn) | NVIDIA GPU: 1-2 dk · CPU (`small`): 8-15 dk · CPU (`base`): 3-5 dk |
+| Claude seçimi | 15-60 sn |
+| Klip başına render (30 sn, 1080p) | 15-40 sn |
+
+Hızlandırmak için: `--range` ile aralık seç, `--model base`, `--candidates 15`.
 
 ## Sorun giderme
 
