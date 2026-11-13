@@ -225,7 +225,28 @@ def media(run, fname):
                                as_attachment=request.args.get("dl") == "1")
 
 
-def serve(host: str = "127.0.0.1", port: int = 7860) -> None:
+def _free_port(host: str, port: int) -> int:
+    import socket
+    for p in range(port, port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, p))
+                return p
+            except OSError:
+                continue
+    return port
+
+
+def serve(host: str = "127.0.0.1", port: int = 7860, open_browser: bool = False) -> None:
+    port = _free_port(host, port)
     threading.Thread(target=_worker, daemon=True).start()
-    print(f"KickClip arayüzü: http://{host}:{port}")
+    url = f"http://{host}:{port}"
+    print("=" * 52)
+    print(f"  KickClip hazır:  {url}")
+    print("  Tarayıcı açılmazsa bu adresi kendin aç.")
+    print("  Kapatmak için bu pencereyi kapat (veya Ctrl+C).")
+    print("=" * 52, flush=True)
+    if open_browser:
+        import webbrowser
+        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     app.run(host=host, port=port, debug=False, threaded=True)

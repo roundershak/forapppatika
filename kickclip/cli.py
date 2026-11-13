@@ -122,6 +122,24 @@ def upload_main(argv: list[str]) -> None:
             json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
+def _load_env() -> None:
+    """Proje klasöründeki .env dosyasını okur (ör. ANTHROPIC_API_KEY=...). Zaten tanımlı olanı ezmez."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(root, ".env")
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and v and not os.environ.get(k):
+                os.environ[k] = v
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     if argv and argv[0] == "upload":
@@ -131,10 +149,11 @@ def main(argv: list[str] | None = None) -> None:
             print(f"HATA: {e}", file=sys.stderr)
             sys.exit(1)
         return
+    _load_env()
     if argv and argv[0] == "web":
         from .web import serve
-        port = int(argv[1]) if len(argv) > 1 else 7860
-        serve(port=port)
+        nums = [a for a in argv[1:] if a.isdigit()]
+        serve(port=int(nums[0]) if nums else 7860, open_browser="--open" in argv)
         return
     args = build_parser().parse_args(argv)
     from .pipeline import run_pipeline

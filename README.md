@@ -34,7 +34,16 @@ Kick yayın linkini ver, uygulama yayını parçalara bölüp **TikTok / Shorts 
 python -m kickclip web
 ```
 Tarayıcıda **http://127.0.0.1:7860** aç, linki yapıştır, *Klipleri üret*. Klipler hazırlandıkça sağda izlenebilir/indirilebilir.
-Windows'ta `baslat.bat` dosyasına çift tıklaman yeterli.
+Windows'ta `baslat.bat` dosyasına çift tıklaman yeterli. İlk çalıştırmada:
+- Python yoksa nasıl kurulacağını söyler (python.org → kurulumda **"Add python.exe to PATH"** işaretli olmalı; 3.12 önerilir),
+- paketleri `.venv` klasörüne kurar (**ilk seferde 5-15 dk**, ilerleme ekranda görünür),
+- ffmpeg yoksa `winget` ile kurar (sonra baslat.bat'i bir kez daha çalıştır),
+- arayüzü başlatıp tarayıcıyı açar. Sonraki açılışlar birkaç saniye sürer.
+
+ZIP olarak indirdiysen önce **"Tümünü ayıkla"** ile klasöre çıkar; ZIP'in içinden çalıştırma.
+
+Claude anahtarını her seferinde yazmamak için `.env.ornek` dosyasının adını `.env` yapıp içine
+`ANTHROPIC_API_KEY=sk-ant-...` yaz.
 
 ### Komut satırı
 ```bash
