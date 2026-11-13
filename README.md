@@ -178,7 +178,7 @@ YouTube, uygulamaların video yükleyebilmesi için senin adına bir "Google Clo
 | `--words 3` | Ekranda aynı anda gösterilen kelime sayısı |
 | `--color "#FFE600"` | Vurgulanan kelime rengi |
 | `--hold 0.45` / `--fade 0.2` | Başta bulanık kalma ve blur'un kalkma süresi |
-| `--bell dosya.mp3` | Kendi zil sesin. Ya da `assets/bell.wav` / `assets/zil.mp3` olarak koy |
+| `--bell dosya.mp3` | Varsayılan: kısa parlak "çın!" (0.3 sn, tık diye biter). Kendi sesini istersen `assets/zil.mp3` (veya zil.wav) olarak koy |
 | `--streamer ad` | Hashtag'lerde kullanılacak yayıncı adı (varsayılan: linkten) |
 | `--no-titles` | Başlık üretme |
 | `--resolution 4k` / `1080p` | Çıktı: 4K 2160x3840 30 fps (varsayılan; YouTube 4K'ya VP9 ve yüksek bit hızı verir, Shorts'ta daha net görünür) ya da 1080p (daha hızlı) |
