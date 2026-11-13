@@ -396,6 +396,27 @@ def yt_connect():
     return jsonify(ok=True)
 
 
+@app.post("/api/youtube/client_secret")
+def yt_client_secret():
+    """Google Cloud'dan indirilen OAuth JSON dosyasını tarayıcıdan yükleyip proje klasörüne kaydeder."""
+    import json as _json
+    f = request.files.get("file")
+    if not f:
+        return jsonify(error="Dosya seçilmedi"), 400
+    try:
+        data = _json.loads(f.read().decode("utf-8-sig"))
+    except Exception:
+        return jsonify(error="Bu bir JSON dosyası değil. Google Cloud'dan indirdiğin client_secret_....json dosyasını seç."), 400
+    if "installed" not in data:
+        if "web" in data:
+            return jsonify(error="Bu 'Web uygulaması' türünde bir istemci. Google Cloud'da istemci türünü "
+                                 "'Masaüstü uygulaması' seçerek yeni bir istemci oluşturup onun JSON'unu yükle."), 400
+        return jsonify(error="Dosya bir Google OAuth istemci dosyası gibi görünmüyor."), 400
+    with open(youtube.CLIENT_SECRET, "w", encoding="utf-8") as out:
+        _json.dump(data, out)
+    return jsonify(ok=True)
+
+
 @app.post("/api/youtube/disconnect")
 def yt_disconnect():
     youtube.disconnect()

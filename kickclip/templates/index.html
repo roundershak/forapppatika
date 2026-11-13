@@ -67,6 +67,16 @@
   .sec .yt a { color:#ff4e45; }
   .row3 { display:grid; grid-template-columns:1fr 1fr 70px; gap:8px; align-items:end; }
   .hide { display:none !important; }
+  .ytbtn { border-color:#ff0033 !important; color:#fff !important; }
+  .ytbtn.ok { background:#1a2a1a; border-color:var(--accent) !important; }
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:flex; align-items:flex-start; justify-content:center; z-index:50; overflow:auto; padding:40px 16px; }
+  .mbox { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px; max-width:620px; width:100%; position:relative; }
+  .mbox h3 { margin:0 0 10px; }
+  .mbox ol { padding-left:20px; line-height:1.7; font-size:14px; }
+  .mbox a { color:#5aa9ff; }
+  .mbox code { background:#0e1115; padding:1px 5px; border-radius:4px; }
+  .mclose { position:absolute; right:14px; top:14px; width:auto; margin:0; padding:4px 10px; }
+  .muted { color:var(--muted); font-size:14px; }
   .empty { color:var(--muted); text-align:center; padding:40px 0; }
   .err { color:var(--err); }
 </style>
@@ -80,8 +90,33 @@
   <nav class="tabs">
     <button class="tab on" data-tab="short">📱 Shorts Klipler</button>
     <button class="tab" data-tab="long">🎬 Uzun Videolar</button>
+    <button class="tab ytbtn" id="ytbtn">▶ YouTube'u bağla</button>
   </nav>
 </header>
+
+<div class="modal hide" id="ytmodal">
+  <div class="mbox">
+    <button class="ghost mclose" id="ytclose">✕</button>
+    <h3>YouTube hesabını bağla</h3>
+    <div id="ytstate"></div>
+    <div id="ytsetup">
+      <p class="muted">Bir kerelik kurulum (~10 dk, ücretsiz). Google, video yükleyen her uygulamadan bir "istemci dosyası" ister:</p>
+      <ol>
+        <li><a href="https://console.cloud.google.com/projectcreate" target="_blank">console.cloud.google.com</a>'a YouTube kanalının olduğu hesapla gir → <b>Yeni proje</b> → ad: <code>KickClip</code> → Oluştur.</li>
+        <li><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank">YouTube Data API v3</a> sayfasında <b>Etkinleştir</b>.</li>
+        <li><a href="https://console.cloud.google.com/auth/overview" target="_blank">Google Auth Platform</a> → <b>Başlayın</b> → uygulama adı <code>KickClip</code>, e-postan → Kitle: <b>Harici</b> → Bitir.</li>
+        <li><a href="https://console.cloud.google.com/auth/audience" target="_blank">Kitle</a> sekmesi → <b>Test kullanıcıları → Kullanıcı ekle</b> → kendi Gmail adresin → Kaydet.</li>
+        <li><a href="https://console.cloud.google.com/auth/clients" target="_blank">İstemciler</a> → <b>İstemci oluştur</b> → tür: <b>Masaüstü uygulaması</b> → Oluştur → <b>JSON'u indir</b>.</li>
+        <li>İndirdiğin dosyayı buraya yükle:</li>
+      </ol>
+      <input type="file" id="ytfile" accept=".json,application/json">
+      <div id="ytfilemsg" class="hint"></div>
+    </div>
+    <button id="ytgo" class="btn-yt hide" style="margin-top:14px">Google hesabımla bağla</button>
+    <p class="hint" id="ytwarn" style="margin-top:10px">Google sayfasında <b>"Google bu uygulamayı doğrulamadı"</b> uyarısı çıkarsa normal (uygulamayı sen oluşturdun):
+      <b>Gelişmiş → KickClip'e git</b> → izinleri işaretle → <b>Devam</b>.</p>
+  </div>
+</div>
 <main>
   <section class="card" id="pane-short">
     <form id="f">
@@ -294,9 +329,39 @@ async function poll(){
 }
 
 let ytTimer = null;
+function openYt(){ $('#ytmodal').classList.remove('hide'); ytInfo(); }
+$('#ytbtn').onclick = openYt;
+$('#ytclose').onclick = () => $('#ytmodal').classList.add('hide');
+$('#ytmodal').onclick = e => { if (e.target.id === 'ytmodal') $('#ytmodal').classList.add('hide'); };
+$('#ytfile').onchange = async () => {
+  const f = $('#ytfile').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/api/youtube/client_secret', {method:'POST', body:fd});
+  const j = await r.json();
+  $('#ytfilemsg').innerHTML = r.ok ? '<span style="color:var(--accent)">✓ Dosya kaydedildi. Şimdi aşağıdaki butona bas.</span>' : `<span class="err">❌ ${esc(j.error)}</span>`;
+  ytInfo();
+};
+$('#ytgo').onclick = async () => {
+  const r = await fetch('/api/youtube/connect', {method:'POST'});
+  if (!r.ok) alert((await r.json()).error); ytInfo();
+};
 async function ytInfo(){
   clearTimeout(ytTimer);
   const s = await (await fetch('/api/youtube/status')).json();
+  // üst buton + pencere
+  const btn = $('#ytbtn');
+  btn.textContent = s.authorized ? `✅ ${s.channel ? s.channel.title : 'YouTube bağlı'}` : "▶ YouTube'u bağla";
+  btn.classList.toggle('ok', !!s.authorized);
+  $('#ytsetup').classList.toggle('hide', !!s.client_secret || !!s.authorized);
+  $('#ytgo').classList.toggle('hide', !s.client_secret || !!s.authorized || s.connect.status === 'running');
+  $('#ytwarn').classList.toggle('hide', !!s.authorized);
+  $('#ytstate').innerHTML = s.authorized
+    ? `<p>✅ Bağlı kanal: <b>${esc(s.channel ? s.channel.title : '?')}</b></p><p class="muted">Artık kliplerde ve uzun videolarda <b>YouTube'a yükle</b> butonunu kullanabilirsin.</p><button class="ghost" id="ytoff2" style="width:auto">Bağlantıyı kes</button>`
+    : s.connect.status === 'running' ? '<p>⏳ Açılan tarayıcı sekmesinde Google hesabını seçip izin ver...</p>'
+    : s.client_secret ? '<p>🔑 İstemci dosyası hazır. Son adım:</p>' : '';
+  if (s.connect.status === 'error') $('#ytstate').innerHTML += `<p class="err">❌ ${esc(s.connect.error)}</p>`;
+  const off2 = $('#ytoff2');
+  if (off2) off2.onclick = async () => { if (confirm('YouTube bağlantısı kesilsin mi?')) { await fetch('/api/youtube/disconnect', {method:'POST'}); ytInfo(); } };
   let yt;
   if (s.connect.status === 'running') {
     yt = '⏳ <b>YouTube:</b> açılan tarayıcı sekmesinde Google hesabını seçip izin ver...';
@@ -307,16 +372,13 @@ async function ytInfo(){
   } else if (s.client_secret) {
     yt = `🔑 <b>YouTube bağlı değil</b> <button class="ghost" id="yton" style="margin-left:6px;padding:2px 8px;color:#fff;border-color:#ff0033">YouTube'u bağla</button>`;
   } else {
-    yt = '⚠️ <b>YouTube bağlı değil:</b> önce proje klasörüne <b>client_secret.json</b> koy (README → YouTube kurulumu), sonra sayfayı yenile';
+    yt = `⚠️ <b>YouTube bağlı değil</b> <button class="ghost" id="yton" style="margin-left:6px;padding:2px 8px;color:#fff;border-color:#ff0033">Nasıl bağlarım?</button>`;
   }
   if (s.connect.status === 'error') yt += `<br><span class="err">❌ ${esc(s.connect.error)}</span>`;
   const ai = s.claude_titles ? '✨ Klip seçimi ve başlıklar <b>Claude</b> ile' : 'ℹ️ Daha iyi seçim/başlık için <b>.env</b> dosyasına <b>ANTHROPIC_API_KEY</b> yaz';
   $('#ytinfo').innerHTML = yt + '<br>' + ai;
   const on = $('#yton'), off = $('#ytoff');
-  if (on) on.onclick = async () => {
-    const r = await fetch('/api/youtube/connect', {method:'POST'});
-    if (!r.ok) alert((await r.json()).error); ytInfo();
-  };
+  if (on) on.onclick = openYt;
   if (off) off.onclick = async () => { if (confirm('YouTube bağlantısı kesilsin mi?')) { await fetch('/api/youtube/disconnect', {method:'POST'}); ytInfo(); } };
 }
 
