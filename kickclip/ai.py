@@ -22,7 +22,7 @@ from .highlights import Segment
 from .subtitles import Transcriber, Word
 from .utils import Logger, default_log, fmt_time
 
-MODEL = os.environ.get("KICKCLIP_RANK_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("KICKCLIP_MODEL", "claude-opus-5-5")
 
 RANK_SCHEMA = {
     "type": "object",

@@ -112,7 +112,7 @@ arayüzde kartın altında görünür, düzenleyebilir ya da **✨ Yeni başlık
   export ANTHROPIC_API_KEY=sk-ant-...
   ```
   Anahtar: https://console.anthropic.com → API Keys. Klip başına maliyeti çok düşüktür.
-  Model `KICKCLIP_TITLE_MODEL` ortam değişkeniyle değiştirilebilir.
+  Model `.env` içinde `KICKCLIP_MODEL=claude-sonnet-5-5` ile daha ucuz bir modele çevrilebilir.
 - Anahtar yoksa dökümdeki en vurucu cümle başlık yapılır.
 
 ## YouTube kurulumu (bir kerelik, ~10 dk)

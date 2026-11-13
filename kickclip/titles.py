@@ -13,7 +13,7 @@ from typing import Optional
 
 from .utils import Logger, default_log
 
-MODEL = os.environ.get("KICKCLIP_TITLE_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("KICKCLIP_MODEL", "claude-opus-5-5")
 
 SCHEMA = {
     "type": "object",
