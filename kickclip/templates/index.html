@@ -129,7 +129,7 @@
       <label>Klip seçimi</label>
       <select name="selection" id="selsel">
         <option value="viral">🔥 Viral olabilecek önemli anlar (tüm konuşmayı okur)</option>
-        <option value="tepki">😂 Tepki anları: gülme, bağırma (hızlı)</option>
+        <option value="tepki">📢 Bağırma / gerilim anları (hızlı)</option>
         <option value="split">✂️ Yayını sırayla parçala</option>
       </select>
       <div class="hint" id="selhint">Tüm yayın yazıya dökülür, Claude drama/itiraf/tartışma/duyuru/komik söz gibi konuşulacak anları seçer.
@@ -309,8 +309,8 @@ document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.datase
 try { setTab(localStorage.getItem('kc_tab') || 'short'); } catch(e) { setTab('short'); }
 
 const selHints = {
-  viral: 'Tüm yayın yazıya dökülür, Claude drama/itiraf/tartışma/duyuru/komik söz gibi konuşulacak anları seçer. Ekran kartı yoksa 6 saatlik yayında döküm ~1 saat sürebilir (bir kez yapılır, kaydedilir).',
-  tepki: 'Sesten gülme/bağırma/heyecan anları bulunur, sadece onlar yazıya dökülüp değerlendirilir. Çok daha hızlı.',
+  viral: 'Claude, bağırma/gerilim anlarına öncelik vererek tüm konuşmayı okur; drama/itiraf/tartışma gibi konuşulacak anları da yakalar (Claude anahtarı yoksa otomatik olarak bağırma/gerilim moduna geçer). Ekran kartı yoksa 6 saatlik yayında döküm ~1 saat sürebilir (bir kez yapılır, kaydedilir).',
+  tepki: 'Sesin en çok yükseldiği, bağırılan, gerilimin tırmandığı anlar bulunur; sadece onlar yazıya dökülüp değerlendirilir. Çok daha hızlı.',
   split: 'Yayın eşit parçalara bölünür, seçim yapılmaz.',
 };
 $('#selsel').onchange = () => {

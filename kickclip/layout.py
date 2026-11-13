@@ -246,6 +246,10 @@ def find_cam_box(frame, face) -> Optional[Rect]:
     w, h = right - left, bottom - top
     if not (2.2 * fw <= w <= 11 * fw and 2.0 * fh <= h <= 9 * fh and 0.6 <= w / h <= 2.6):
         return None
+    if h > w * 0.8:  # webcam genelde 16:9; alt çizgi büyük ihtimalle başka bir panele ait (chat vb.)
+        h = w * 0.5625
+        top = max(top, min(cy - h * 0.45, bottom - h))
+        bottom = top + h
     return Rect(int(left) + 2, int(top) + 2, int(w) - 4, int(h) - 4).even()
 
 
@@ -275,23 +279,29 @@ def analyze_scene(frames: list, log: Logger = default_log) -> tuple[str, Optiona
         else:
             clusters.append({"cx": cx, "cy": cy, "fw": fw, "d": [(cx, cy, fw, fh)], "f": {i}})
     need = max(2, int(np.ceil(n * 0.5))) if n >= 2 else 1
+    strong_need = max(2, int(np.ceil(n * 0.75))) if n >= 2 else 1
+    for c in clusters:
+        c["size"] = float(np.median([d[2] for d in c["d"]]))
     stable = [c for c in clusters if len(c["f"]) >= need]
-    if len(stable) >= 3:
-        return "group", None, None
+    strong = [c for c in clusters if len(c["f"]) >= strong_need]
+    # grup görüşmesi: en az 3 yüz neredeyse tüm karelerde aynı yerde ve benzer boyutta (Discord ızgarası)
+    if len(strong) >= 3:
+        sizes = sorted(c["size"] for c in strong)
+        if sizes[-1] / max(1.0, sizes[0]) <= 2.2:
+            return "group", None, None
     big = [d for _, d in allf if d[2] >= 0.045 * W]
     if not stable:
         if len({i for i, d in allf if d[2] >= 0.045 * W}) >= need:
             med = tuple(np.median(np.array(big), axis=0))
             return "fullcam", med, None
         return "none", None, None
-    best = max(stable, key=lambda c: len(c["f"]))
+    # yayıncının kamerası: en sürekli görünen yüz (kayan sayfadaki/videodaki yüzler gelip gider);
+    # eşitlikte daha büyük olan
+    pool = strong or stable
+    best = max(pool, key=lambda c: (len(c["f"]), c["size"]))
     face = tuple(float(v) for v in np.median(np.array(best["d"]), axis=0))
     if face[2] >= 0.06 * W:
         return "fullcam", face, None
-    if len(stable) == 2:
-        # iki sabit yüz: büyük olanı yayıncı kabul et
-        best = max(stable, key=lambda c: np.median([d[2] for d in c["d"]]))
-        face = tuple(float(v) for v in np.median(np.array(best["d"]), axis=0))
     boxes = [b for b in (find_cam_box(f, face) for f in frames) if b is not None]
     box = None
     if boxes:

@@ -31,7 +31,10 @@ klip kanalı editörüsün. Sana bir yayının zaman damgalı tam konuşma dök�
 işaretlediği yüksek tepki anları verilecek.
 
 Görevin: izleyicinin kaydırmayı bırakıp izleyeceği, paylaşacağı, yorum yazacağı anları bulmak.
-Öncelik sırası (sadece gülme/bağırma değil, ÖNEMLİ ve KONUŞULACAK anlar):
+Öncelik sırası:
+- BAĞIRMA, sesin aniden yükseldiği, GERİLİMİN tırmandığı anlar (kavga, sinir krizi, panik, şok, büyük heyecan) -
+  'yüksek tepki anları' listesindeki zamanlar bunun ipucudur, bunlara özellikle bak
+- ÖNEMLİ ve KONUŞULACAK anlar:
 - drama / ifşa / itiraf / gizli bilgi, başka yayıncı veya ünlüler hakkında söylenenler
 - tartışma, kavga, sert cevap, chat'le ya da biriyle atışma
 - olay yaratacak görüş (hot take), tartışmalı açıklama
@@ -191,7 +194,7 @@ def _heuristic(words: list[Word], feats: Optional[Features], n: int, clip_len: f
     else:
         audio = np.zeros(len(times))
     z = lambda a: (a - a.mean()) / (a.std() if a.std() > 1e-6 else 1.0)  # noqa: E731
-    total = 0.6 * z(text_sc) + 0.4 * z(audio)
+    total = 0.35 * z(text_sc) + 0.65 * z(audio)
     peaks = pick_peaks(total, 1.5 * clip_len / step * 0.5, n)  # pick_peaks saniyeyi 0.5 sn/indeks sayar
     out = []
     for i in sorted(peaks, key=lambda k: -total[k]):

@@ -35,6 +35,11 @@ def _slug(s: str) -> str:
     return re.sub(r"[^\w\-]+", "_", s, flags=re.UNICODE).strip("_")[:60] or "klip"
 
 
+def _llm_ok() -> bool:
+    from . import llm
+    return llm.available()
+
+
 def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[ProgressFn] = None,
                  on_clip: Optional[ClipDoneFn] = None, should_stop: Callable[[], bool] = lambda: False) -> list[dict]:
     require_ffmpeg()
@@ -68,6 +73,13 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         segs = split_segments(None, src.start, src.end, clip_len, cfg.max_clips, log)
     elif cfg.mode == "split":
         segs = split_segments(feats, src.start, src.end, clip_len, cfg.max_clips, log)
+    elif cfg.ai and cfg.selection == "viral" and transcriber is not None and not _llm_ok():
+        log("Viral mod Claude ister (ANTHROPIC_API_KEY yok): ses odaklı seçime geçiliyor "
+            "(bağırma, ses yükselmesi, gerilim). Tüm yayının yazıya dökülmesi atlandı.")
+        k = cfg.ai_candidates or max(cfg.max_clips + 3, cfg.max_clips * 2)
+        cands = find_candidates(feats, clip_len, k, cfg.lead_ratio, src.start, src.end, log)
+        segs = rank(src, cands, cfg.max_clips, clip_len, cfg.lead_ratio, transcriber,
+                    cfg.ai_window or max(45.0, clip_len * 1.5), cfg.flex_length, log, should_stop)
     elif cfg.ai and cfg.selection == "viral" and transcriber is not None:
         from .viral import rank_viral, transcribe_all
         t0 = time.time()
@@ -76,7 +88,7 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         prog(0.38)
         segs = rank_viral(src, feats, all_words, cfg.max_clips, clip_len, cfg.flex_length, log)
     else:
-        k = cfg.ai_candidates or max(cfg.max_clips + 3, int(cfg.max_clips * 2.5))
+        k = cfg.ai_candidates or max(cfg.max_clips + 3, cfg.max_clips * 2)
         k = k if cfg.ai else cfg.max_clips
         cands = find_candidates(feats, clip_len, k, cfg.lead_ratio, src.start, src.end, log)
         if cfg.ai:

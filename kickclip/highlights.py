@@ -133,20 +133,49 @@ def _z(a: np.ndarray) -> np.ndarray:
     return (a - a.mean()) / (s if s > 1e-6 else 1.0)
 
 
+def _rolling_max(x: np.ndarray, k: int) -> np.ndarray:
+    from numpy.lib.stride_tricks import sliding_window_view
+    k = max(1, k)
+    pad = np.pad(x, (k // 2, k - 1 - k // 2), mode="edge")
+    return sliding_window_view(pad, k).max(axis=1)
+
+
+def _shift(x: np.ndarray, n: int) -> np.ndarray:
+    """x'i n pencere sağa kaydır (t anında t-n değerini görmek için)."""
+    if n <= 0:
+        return x
+    return np.concatenate([np.full(n, x[0]), x[:-n]])
+
+
 def reaction_score(f: Features, clip_len: float) -> np.ndarray:
+    """Bağırma / ses yükselmesi / gerilim odaklı puan.
+
+    - bağırma: yayıncının sesinin (konuşma bandı) yerel tabanın ne kadar üstüne çıktığı (2 sn tepe)
+    - ses patlaması: toplam sesin tabanın üstüne ani çıkışı (2 sn tepe)
+    - gerilim: son ~15 sn boyunca sesin yüksek kalması (tek bir 'pat' değil, süren heyecan/kavga)
+    - tırmanma: son 10 sn'nin önceki 20 sn'ye göre ne kadar yükseldiği (sakinlikten sonra patlama)
+    - gülme ritmi küçük bir ek puan
+    """
     db = np.maximum(f.db, -70)
     voice = np.maximum(f.voice_db, -70)
-    sm = int(2.0 / WIN)
-    base = int(90 / WIN)
-    loud_ex = _moving(db, sm) - _moving(db, base, "median")
-    voice_ex = _moving(voice, sm) - _moving(voice, base, "median")
-    # sesin ne kadarı insan sesi bandında: 1 = konuşma/gülme, 0 = bas ağırlıklı (patlama, müzik)
-    voiceness = _moving(np.clip((voice - db + 12) / 9, 0, 1), sm)
+    w = lambda sec: max(1, int(sec / WIN))  # noqa: E731
+    base_db = _moving(db, w(90), "median")
+    base_v = _moving(voice, w(90), "median")
+    voiceness = _moving(np.clip((voice - db + 12) / 9, 0, 1), w(2))
+
+    loud_ex = np.maximum(_moving(db, w(1)) - base_db, 0)
+    voice_ex = np.maximum(_moving(voice, w(1)) - base_v, 0) * voiceness
+
+    shout = _rolling_max(voice_ex, w(2))
+    burst = _rolling_max(loud_ex, w(2))
+    tension = _shift(_moving(np.maximum(loud_ex, voice_ex), w(15)), w(5))  # tepenin öncesi + sonrası
+    recent = _shift(_moving(db, w(10)), w(5) - w(5) // 2)
+    before = _shift(_moving(db, w(20)), w(15))
+    rise = np.maximum(recent - before, 0)
     speaking = (voice > np.median(voice) - 3).astype(float) * voiceness
-    rhythm = _moving(f.rhythm * speaking, sm)
-    density = _moving(speaking, int(clip_len / WIN))
-    return (0.40 * _z(np.maximum(voice_ex, 0) * voiceness) + 0.15 * _z(np.maximum(loud_ex, 0))
-            + 0.30 * _z(rhythm) + 0.15 * _z(density))
+    rhythm = _moving(f.rhythm * speaking, w(2))
+    return (0.35 * _z(shout) + 0.25 * _z(burst) + 0.25 * _z(tension) + 0.10 * _z(rise)
+            + 0.05 * _z(rhythm))
 
 
 def pick_peaks(score: np.ndarray, min_gap_s: float, k: int, edge_s: float = 0.0) -> list[int]:

@@ -68,13 +68,30 @@ class Transcriber:
             self.log(f"Whisper modeli yükleniyor: {self.model_name} ({device}). İlk seferde internetten indirilir "
                      f"(small ≈ 480 MB, birkaç dakika sürebilir; sadece bir kez).")
             try:
-                self._model = WhisperModel(self.model_name, device=device, compute_type=compute)
+                self._model = WhisperModel(self.model_name, device=device, compute_type=compute,
+                                           cpu_threads=os.cpu_count() or 4)
             except Exception as e:
                 self._error = RuntimeError(f"Whisper modeli yüklenemedi: {e}")
                 raise self._error
         return self._model
 
     def words(self, audio_path: str) -> list[Word]:
+        import threading
+        import time as _t
+        done = threading.Event()
+        t0 = _t.time()
+
+        def beat():  # uzun sürünce donmuş sanılmasın
+            while not done.wait(20):
+                self.log(f"   Whisper çalışıyor... {int(_t.time() - t0)} sn (ekran kartı yoksa yavaş olabilir)")
+
+        threading.Thread(target=beat, daemon=True).start()
+        try:
+            return self._words(audio_path)
+        finally:
+            done.set()
+
+    def _words(self, audio_path: str) -> list[Word]:
         model = self._load()
         segments, _info = model.transcribe(
             _load_audio(audio_path), language=self.language, word_timestamps=True, vad_filter=True,

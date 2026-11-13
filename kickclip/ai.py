@@ -57,6 +57,10 @@ Görevin: izleyicinin durup izleyeceği en iyi anları seçmek ve her biri için
 chat'e ya da birine verilen sert/komik cevap, epik ya da rezil bir oyun anı, kendi içinde anlaşılan kısa bir hikâye.
 Kötü klip: sıradan oyun anlatımı, bağlamsız yarım cümle, uzun sessizlik, reklam/bağış okuma, teknik ayar konuşması.
 
+ÖNCELİK: Bu kanal için en değerli anlar yayıncının BAĞIRDIĞI, sesin aniden YÜKSELDİĞİ, GERİLİMİN tırmandığı
+(kavga, sinir, panik, büyük heyecan, şok) anlardır. 'ses puanı' bunu ölçer: ses puanı yüksek adayları, metni
+çok sıradan değilse, öne al. Sakin konuşmayı ancak gerçekten çok güçlü bir içerikse seç.
+
 Kurallar:
 - Klip olmaya değmeyen adayları LİSTEYE KOYMA. En fazla istenen sayı kadar seç, en iyiden kötüye sırala.
 - start/end mutlak saniye cinsinden ve adayın penceresi içinde olmalı. Süre verilen minimum-maksimum arasında olmalı.
@@ -145,7 +149,7 @@ def _heuristic(cands, wins, words_list, n, clip_len, lead_ratio) -> list[Segment
     a = np.array([c.score for c in cands], dtype=float)
     t = np.array([_text_score(w) for w in words_list], dtype=float)
     z = lambda x: (x - x.mean()) / (x.std() if x.std() > 1e-6 else 1.0)  # noqa: E731
-    total = 0.6 * z(a) + 0.4 * z(t)
+    total = 0.8 * z(a) + 0.2 * z(t)  # ses (bağırma/gerilim) ağırlıklı
     order = np.argsort(total)[::-1][:n]
     out = []
     for i in order:
