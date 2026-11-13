@@ -1,0 +1,8 @@
+{
+  "voice": "JBFqnCBsd6RMkjVDRZzb",
+  "model": "eleven_multilingual_v2",
+  "scenes": [
+    { "id": "intro", "text": "Merhaba! Bugün birlikte yeni bir şey öğreneceğiz." },
+    { "id": "outro", "text": "İzlediğin için teşekkürler, görüşmek üzere!" }
+  ]
+}
