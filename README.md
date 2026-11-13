@@ -81,22 +81,34 @@ arayüzde kartın altında görünür, düzenleyebilir ya da **✨ Yeni başlık
   Model `KICKCLIP_TITLE_MODEL` ortam değişkeniyle değiştirilebilir.
 - Anahtar yoksa dökümdeki en vurucu cümle başlık yapılır.
 
-## YouTube kurulumu (bir kerelik)
+## YouTube kurulumu (bir kerelik, ~10 dk)
 
-1. https://console.cloud.google.com → yeni proje oluştur.
-2. **APIs & Services → Library** → "YouTube Data API v3" → **Enable**.
-3. **OAuth consent screen** → External → uygulama adı ve e-postanı gir → **Test users** kısmına kendi Google hesabını ekle.
-4. **Credentials → Create credentials → OAuth client ID → Desktop app** → JSON'u indir.
-5. İndirdiğin dosyayı proje klasörüne **`client_secret.json`** adıyla koy.
-6. İlk yüklemede tarayıcı açılır, kanalının olduğu hesabı seçip izin ver. Token `youtube_token.json`'a kaydedilir.
+YouTube, uygulamaların video yükleyebilmesi için senin adına bir "Google Cloud projesi" ister. Ücretsizdir.
+
+1. https://console.cloud.google.com adresine YouTube kanalının olduğu Google hesabıyla gir.
+   Üstteki proje seçiciden **Yeni proje** → ad: `KickClip` → Oluştur → projeyi seç.
+2. Sol menü **API'ler ve Hizmetler → Kitaplık** → "**YouTube Data API v3**" ara → **Etkinleştir**.
+3. Sol menü **Google Auth Platform** (eski adı "OAuth izin ekranı") → **Başlayın**:
+   - Uygulama adı: `KickClip`, destek e-postası: kendi e-postan → İleri
+   - Kitle: **Harici (External)** → İleri → iletişim e-postası → Bitir
+4. **Kitle (Audience)** sekmesi → **Test kullanıcıları → Kullanıcı ekle** → kendi Gmail adresini ekle → Kaydet.
+5. **İstemciler (Clients)** sekmesi → **İstemci oluştur** → Uygulama türü: **Masaüstü uygulaması** → Oluştur
+   → açılan pencerede **JSON'u indir**.
+6. İnen dosyanın adını **`client_secret.json`** yap ve KickClip klasörüne (baslat.bat'ın yanına) koy.
+7. KickClip arayüzünü yenile → **YouTube'u bağla** → açılan Google sayfasında hesabını seç:
+   - "**Google bu uygulamayı doğrulamadı**" uyarısı normal (uygulamayı sen oluşturdun) →
+     **Gelişmiş → KickClip'e git (güvenli değil)** → izinleri işaretle → **Devam**.
+   - Arayüzde "✅ YouTube bağlı · kanal: ..." görünür. Bitti.
 
 Önemli notlar:
-- **Doğrulanmamış Google projeleri** ile yüklenen videoları YouTube **özel (private)** olarak kilitleyebilir.
-  Herkese açık yükleme için projenin YouTube API denetiminden geçmesi gerekir
-  (https://support.google.com/youtube/contact/yt_api_form). O zamana kadar videolar özel yüklenir,
-  YouTube Studio'dan tek tıkla herkese açık yapabilirsin.
-- Varsayılan API kotası günde ~**6 yükleme**dir (yükleme başına 1600 birim / 10.000). Daha fazlası için Google'dan kota artırımı istenir.
-- Klipler dikey ve 3 dakikadan kısa olduğu için YouTube bunları otomatik **Shorts** olarak sınıflandırır; başlığa `#shorts` da eklenir.
+- **7 günde bir yeniden bağlanma:** Proje "Test" modundayken Google izni 7 günde bir sona erer; o zaman
+  **YouTube'u bağla**'ya tekrar basman (ya da ilk yüklemede açılan sayfada izin vermen) yeterli. Bunu kaldırmak için
+  Google Auth Platform → Kitle → **Uygulamayı yayınla** (kişisel kullanımda doğrulama gerekmez, uyarı ekranı kalır).
+- **Videolar özel yüklenebilir:** Google, denetimden geçmemiş projelerden yüklenen videoları **özel** olarak kilitleyebilir.
+  Öyle olursa YouTube Studio'dan tek tıkla herkese açık yaparsın. Kalıcı çözüm: YouTube API denetim formu
+  (https://support.google.com/youtube/contact/yt_api_form).
+- Varsayılan API kotası günde ~**6 yükleme** (yükleme başına 1600 / 10.000 birim).
+- `client_secret.json` ve `youtube_token.json` dosyalarını kimseyle paylaşma (GitHub'a gönderilmez).
 
 ### Yükleme
 

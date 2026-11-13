@@ -15,9 +15,11 @@ from .titles import ensure_shorts_title
 from .utils import Logger, default_log
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
+          "https://www.googleapis.com/auth/youtube.readonly"]  # bağlı kanalın adını göstermek için
 CLIENT_SECRET = os.environ.get("KICKCLIP_CLIENT_SECRET", os.path.join(ROOT, "client_secret.json"))
 TOKEN_FILE = os.environ.get("KICKCLIP_YT_TOKEN", os.path.join(ROOT, "youtube_token.json"))
+CHANNEL_FILE = os.path.join(os.path.dirname(TOKEN_FILE), "youtube_channel.json")
 _lock = threading.Lock()
 
 
@@ -35,7 +37,12 @@ def _credentials():
 
     creds = None
     if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+            if not set(SCOPES) <= set(creds.scopes or []):
+                creds = None  # eski/eksik izinli token -> yeniden izin iste
+        except Exception:
+            creds = None
     if creds and creds.valid:
         return creds
     if creds and creds.expired and creds.refresh_token:
@@ -59,6 +66,44 @@ def _credentials():
 
 def is_authorized() -> bool:
     return os.path.exists(TOKEN_FILE)
+
+
+def connect() -> dict:
+    """Tarayıcıda Google izni alır, bağlanan kanalı döndürür ve kaydeder."""
+    import json
+    from googleapiclient.discovery import build
+    with _lock:
+        creds = _credentials()
+    yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
+    items = yt.channels().list(part="snippet", mine=True).execute().get("items", [])
+    if not items:
+        info = {"title": "(bu hesapta YouTube kanalı yok - önce youtube.com'da kanal oluştur)", "id": None}
+    else:
+        ch = items[0]
+        info = {"title": ch["snippet"]["title"], "id": ch["id"],
+                "url": f"https://youtube.com/channel/{ch['id']}"}
+    with open(CHANNEL_FILE, "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False)
+    return info
+
+
+def channel() -> dict | None:
+    import json
+    if not (is_authorized() and os.path.exists(CHANNEL_FILE)):
+        return None
+    try:
+        with open(CHANNEL_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def disconnect() -> None:
+    for p in (TOKEN_FILE, CHANNEL_FILE):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
 
 
 def has_client_secret() -> bool:

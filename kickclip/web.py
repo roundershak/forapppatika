@@ -211,10 +211,41 @@ def upload_clip(run, name):
     return jsonify(ok=True)
 
 
+YT_CONNECT: dict = {"status": "idle", "error": None}
+
+
 @app.get("/api/youtube/status")
 def yt_status():
     return jsonify(client_secret=youtube.has_client_secret(), authorized=youtube.is_authorized(),
+                   channel=youtube.channel(), connect=YT_CONNECT,
                    claude_titles=bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")))
+
+
+@app.post("/api/youtube/connect")
+def yt_connect():
+    if not youtube.has_client_secret():
+        return jsonify(error="client_secret.json bulunamadı. Önce Google Cloud kurulumunu yap (README)."), 400
+    if YT_CONNECT["status"] == "running":
+        return jsonify(ok=True)
+    YT_CONNECT.update(status="running", error=None)
+
+    def work():
+        try:
+            youtube.connect()
+            YT_CONNECT.update(status="done")
+        except Exception as e:
+            traceback.print_exc()
+            YT_CONNECT.update(status="error", error=str(e))
+
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify(ok=True)
+
+
+@app.post("/api/youtube/disconnect")
+def yt_disconnect():
+    youtube.disconnect()
+    YT_CONNECT.update(status="idle", error=None)
+    return jsonify(ok=True)
 
 
 @app.get("/media/<run>/<fname>")

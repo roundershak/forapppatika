@@ -204,14 +204,31 @@ async function poll(){
   if (running) timer = setTimeout(poll, 1500); else loadLibrary();
 }
 
+let ytTimer = null;
 async function ytInfo(){
+  clearTimeout(ytTimer);
   const s = await (await fetch('/api/youtube/status')).json();
-  const parts = [];
-  parts.push(s.authorized ? '✅ <b>YouTube bağlı</b>'
-    : s.client_secret ? '🔑 <b>YouTube:</b> ilk yüklemede tarayıcıda Google izni istenecek'
-    : '⚠️ <b>YouTube bağlı değil:</b> proje klasörüne <b>client_secret.json</b> koy (README → YouTube kurulumu)');
-  parts.push(s.claude_titles ? '✨ Başlıklar <b>Claude</b> ile üretiliyor' : 'ℹ️ Daha iyi başlıklar için <b>ANTHROPIC_API_KEY</b> tanımla (şu an basit başlık)');
-  $('#ytinfo').innerHTML = parts.join('<br>');
+  let yt;
+  if (s.connect.status === 'running') {
+    yt = '⏳ <b>YouTube:</b> açılan tarayıcı sekmesinde Google hesabını seçip izin ver...';
+    ytTimer = setTimeout(ytInfo, 2000);
+  } else if (s.authorized) {
+    const ch = s.channel ? (s.channel.url ? `<a href="${esc(s.channel.url)}" target="_blank" style="color:#ff4e45">${esc(s.channel.title)}</a>` : esc(s.channel.title)) : '';
+    yt = `✅ <b>YouTube bağlı</b> ${ch ? '· kanal: ' + ch : ''} <button class="ghost" id="ytoff" style="margin-left:6px;padding:2px 8px">Bağlantıyı kes</button>`;
+  } else if (s.client_secret) {
+    yt = `🔑 <b>YouTube bağlı değil</b> <button class="ghost" id="yton" style="margin-left:6px;padding:2px 8px;color:#fff;border-color:#ff0033">YouTube'u bağla</button>`;
+  } else {
+    yt = '⚠️ <b>YouTube bağlı değil:</b> önce proje klasörüne <b>client_secret.json</b> koy (README → YouTube kurulumu), sonra sayfayı yenile';
+  }
+  if (s.connect.status === 'error') yt += `<br><span class="err">❌ ${esc(s.connect.error)}</span>`;
+  const ai = s.claude_titles ? '✨ Klip seçimi ve başlıklar <b>Claude</b> ile' : 'ℹ️ Daha iyi seçim/başlık için <b>.env</b> dosyasına <b>ANTHROPIC_API_KEY</b> yaz';
+  $('#ytinfo').innerHTML = yt + '<br>' + ai;
+  const on = $('#yton'), off = $('#ytoff');
+  if (on) on.onclick = async () => {
+    const r = await fetch('/api/youtube/connect', {method:'POST'});
+    if (!r.ok) alert((await r.json()).error); ytInfo();
+  };
+  if (off) off.onclick = async () => { if (confirm('YouTube bağlantısı kesilsin mi?')) { await fetch('/api/youtube/disconnect', {method:'POST'}); ytInfo(); } };
 }
 
 function ytHtml(c){
