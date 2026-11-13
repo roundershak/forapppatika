@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field, replace
 from typing import Callable, Optional
 
 from . import llm
-from .layout import detect_face_region, resolve_cam_rect
+from .layout import analyze_scene, resolve_cam_rect
 from .source import Source, resolve
 from .thumbnail import compose
 from .utils import Logger, default_log, fmt_time, parse_range, parse_time
@@ -471,19 +471,22 @@ def run_longform(cfg: LongConfig, log: Logger = default_log, progress: Optional[
         log(f"  Bölüm {i}: {fmt_time(s.start)} - {fmt_time(s.end)} ({s.duration / 60:.0f} dk) {s.watched}")
     prog(0.62)
 
-    # kamera yeri (1080p karelerden)
-    probe_times = [s.start + s.duration * f for s in sections[:6] for f in (0.3, 0.7)]
-    with ThreadPoolExecutor(max_workers=6) as ex:
-        hi = [f for f in ex.map(src.grab_frame, probe_times) if f is not None]
-    cam = None
-    if hi:
-        Hh, Ww = hi[0].shape[:2]
-        face = detect_face_region(hi, log=log)
-        r = resolve_cam_rect("auto", Ww, Hh, 0.85, face, cam_zoom=2.6) if face else None
-        if r:
-            cam = {"x": r.x, "y": r.y, "w": r.w, "h": r.h}
-    if cam is None:
-        log("Yayıncı kamerası bulunamadı; kapaklar yüzsüz hazırlanacak.")
+    # kamera yeri her bölüm için ayrı bulunur (yayıncı kamerayı yayında taşıyabiliyor)
+    def section_cam(sec: Section) -> Optional[dict]:
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            frames = list(ex.map(src.grab_frame, [sec.start + sec.duration * f for f in (0.2, 0.4, 0.6, 0.8)]))
+        frames = [f for f in frames if f is not None]
+        if not frames:
+            return None
+        Hh, Ww = frames[0].shape[:2]
+        kind, face, box = analyze_scene(frames, log)
+        if kind not in ("cam", "fullcam") or face is None:
+            return None
+        if box is not None:
+            r = box
+        else:
+            r = resolve_cam_rect("auto", Ww, Hh, 0.85, face, cam_zoom=3.0 if kind == "cam" else 2.2)
+        return {"x": r.x, "y": r.y, "w": r.w, "h": r.h} if r else None
 
     run_dir = os.path.join(cfg.output_dir, f"uzun_{_slug(src.name)}_{time.strftime('%Y%m%d_%H%M%S')}")
     os.makedirs(run_dir, exist_ok=True)
@@ -494,6 +497,9 @@ def run_longform(cfg: LongConfig, log: Logger = default_log, progress: Optional[
         name = f"bolum_{i:02d}"
         log(f"[{i}/{len(sections)}] Kapak ve başlık hazırlanıyor...")
         meta, _ = section_meta(src, s, streamer, log)
+        cam = section_cam(s)
+        if cam is None:
+            log(f"[{i}/{len(sections)}] Yayıncı kamerası bulunamadı; kapak yüzsüz hazırlanacak.")
         meta["face_time"] = reaction_time(src, s, log) if cam else meta["background_time"]
         cover = os.path.join(run_dir, f"{name}.jpg")
         try:

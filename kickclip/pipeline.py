@@ -17,7 +17,7 @@ from typing import Callable, Optional
 from .ai import rank
 from .config import ClipConfig
 from .highlights import Segment, analyze, find_candidates, split_segments
-from .layout import detect_face_region, resolve_cam_rect, resolve_screen_rect
+from .layout import analyze_scene, plan_layout, resolve_cam_rect, resolve_screen_rect
 from .render import make_thumbnail, render_clip
 from .sfx import get_bell
 from .source import resolve
@@ -93,35 +93,40 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         log(f"  #{i} {fmt_time(disp(s.start))} ({s.duration:.0f} sn) {s.category + ': ' if s.category else ''}{s.reason}")
     prog(0.45)
 
-    # 3) Yerleşim: seçilen kliplerden kare örnekleyip kamerayı bul
-    log("Kareler örnekleniyor...")
-    times = []
-    for s in segs[:8]:
-        times += [s.start + s.duration * f for f in (0.25, 0.6)]
+    # 3) Yerleşim: her klip için ayrı (yayıncılar kamerayı yayın içinde taşıyabiliyor,
+    #    grup görüşmesi / tam ekran kamera gibi sahneler olabiliyor)
+    log("Klip kareleri örnekleniyor (sahne/kamera tespiti)...")
     from concurrent.futures import ThreadPoolExecutor
+    fracs = (0.12, 0.35, 0.6, 0.85)
     with ThreadPoolExecutor(max_workers=6) as ex:
-        frames = [f for f in ex.map(src.grab_frame, times) if f is not None]
-    if not frames:
+        allframes = list(ex.map(src.grab_frame, [s.start + s.duration * f for s in segs for f in fracs]))
+    clip_frames = [allframes[i * len(fracs):(i + 1) * len(fracs)] for i in range(len(segs))]
+    first = next((f for f in allframes if f is not None), None)
+    if first is None:
         raise RuntimeError("Videodan kare alınamadı.")
-    H, W = frames[0].shape[:2]
+    H, W = first.shape[:2]
     log(f"Video çözünürlüğü: {W}x{H}")
     top_h = round(cfg.height * cfg.cam_ratio / 2) * 2
     top_aspect = cfg.width / top_h
     bot_aspect = cfg.width / (cfg.height - top_h)
-    face = None
-    if cfg.cam.strip().lower() == "auto":
-        log("Yayıncı kamerası aranıyor...")
-        face = detect_face_region(frames, log=log)
-        if face is None:
-            log("Kamera bulunamadı -> tam ekran (bulanık arka planlı) düzen kullanılacak. "
-                "Elle ayarlamak için kamera konumunu seçin (ör. top-left / x,y,w,h).")
-    cam = resolve_cam_rect(cfg.cam, W, H, top_aspect, face, cfg.cam_size, cfg.cam_zoom)
-    screen_mode, screen = resolve_screen_rect(cfg.screen, W, H, bot_aspect if cam else cfg.width / cfg.height,
-                                              cfg.screen_zoom, cam)
-    if cam:
-        log(f"Kamera alanı: x={cam.x} y={cam.y} w={cam.w} h={cam.h}")
-    log(f"Ekran alanı ({screen_mode}): x={screen.x} y={screen.y} w={screen.w} h={screen.h}")
-    sub_pos = cfg.sub_position if cam else max(cfg.sub_position, 0.70)
+    auto_cam = cfg.cam.strip().lower() == "auto"
+    fixed = None
+    if not auto_cam:  # elle seçilmiş kamera: tüm klipler için aynı
+        cam0 = resolve_cam_rect(cfg.cam, W, H, top_aspect, None, cfg.cam_size, cfg.cam_zoom)
+        mode0, screen0 = resolve_screen_rect(cfg.screen, W, H, bot_aspect if cam0 else cfg.width / cfg.height,
+                                             cfg.screen_zoom, cam0)
+        fixed = (cam0, mode0, screen0)
+    scene_names = {"cam": "köşe kamerası", "fullcam": "tam ekran kamera", "group": "grup görüşmesi",
+                   "none": "kamerasız"}
+
+    def layout_for(i):
+        if fixed:
+            return fixed + ("elle",)
+        kind, face, box = analyze_scene(clip_frames[i], log)
+        cam, mode, screen = plan_layout(kind, face, box, W, H, top_aspect, bot_aspect, cfg.screen,
+                                        cfg.screen_zoom, max(cfg.cam_zoom, 4.5))
+        return cam, mode, screen, scene_names.get(kind, kind)
+
     ow, oh = cfg.out_size()
     log(f"Çıktı: {ow}x{oh}, {cfg.fps} fps")
 
@@ -142,6 +147,9 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         name = f"klip_{idx:02d}"
         log(f"[{idx}/{n}] {name}: {fmt_time(disp(seg.start))} - {fmt_time(disp(seg.end))}")
         out_mp4 = os.path.join(run_dir, f"{name}.mp4")
+        cam, screen_mode, screen, scene = layout_for(idx - 1)
+        sub_pos = cfg.sub_position if cam else max(cfg.sub_position, 0.70)
+        log(f"[{idx}/{n}] Sahne: {scene}" + (f" · kamera {cam.w}x{cam.h} @({cam.x},{cam.y})" if cam else ""))
         words = [w for w in seg.words if w.end > seg.start and w.start < seg.end]
         if cfg.subtitles and transcriber and not seg.words:
             wav = os.path.join(tmp_dir, f"{name}.wav")

@@ -31,6 +31,16 @@ def _quiet_hf() -> None:
         pass
 
 
+def _load_audio(path: str):
+    """Sesi 16 kHz mono float32 dizi olarak okur (ffmpeg ile).
+    faster-whisper'ın dosya okuyucusu (PyAV) yeni sürümlerde uyumsuz olabildiği için kullanılmıyor."""
+    import subprocess
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout
+    return np.frombuffer(raw[: len(raw) // 2 * 2], dtype=np.int16).astype(np.float32) / 32768.0
+
+
 class Transcriber:
     def __init__(self, model: str = "small", device: str = "auto", language: Optional[str] = "tr",
                  log: Logger = default_log):
@@ -67,15 +77,21 @@ class Transcriber:
     def words(self, audio_path: str) -> list[Word]:
         model = self._load()
         segments, _info = model.transcribe(
-            audio_path, language=self.language, word_timestamps=True, vad_filter=True,
+            _load_audio(audio_path), language=self.language, word_timestamps=True, vad_filter=True,
             beam_size=5, condition_on_previous_text=False,
         )
         out: list[Word] = []
         for seg in segments:
             for w in seg.words or []:
                 txt = w.word.strip()
-                if txt:
-                    out.append(Word(float(w.start), float(w.end), txt))
+                if not txt:
+                    continue
+                # Whisper "Ere 'ye" gibi ekleri ayrı kelime verebiliyor -> önceki kelimeye yapıştır
+                if out and txt[0] in "'’" and len(txt) <= 6:
+                    prev = out[-1]
+                    out[-1] = Word(prev.start, float(w.end), prev.text + txt)
+                    continue
+                out.append(Word(float(w.start), float(w.end), txt))
         return out
 
 

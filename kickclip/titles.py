@@ -55,6 +55,10 @@ def _fallback(transcript: str, streamer: str, source_title: str) -> dict:
         return score - abs(len(s) - 45) / 30
 
     best = max(sentences, key=punch) if sentences else ""
+    words = best.split()
+    if len(words) > 8:  # başlık kısa ve vurucu olsun: en "tepkili" 6-8 kelimelik parça
+        chunks = [" ".join(words[i:i + 7]) for i in range(0, len(words) - 6)]
+        best = max(chunks, key=punch)
     if len(best) > 70:
         best = best[:67].rsplit(" ", 1)[0] + "..."
     who = streamer or "Yayıncı"
