@@ -124,12 +124,16 @@
       <input name="source" placeholder="https://kick.com/kanal/videos/..." required>
       <div class="hint">Canlı yayın, VOD veya klip linki olabilir.</div>
 
+      <label>Klip seçimi</label>
+      <select name="selection" id="selsel">
+        <option value="viral">🔥 Viral olabilecek önemli anlar (tüm konuşmayı okur)</option>
+        <option value="tepki">😂 Tepki anları: gülme, bağırma (hızlı)</option>
+        <option value="split">✂️ Yayını sırayla parçala</option>
+      </select>
+      <div class="hint" id="selhint">Tüm yayın yazıya dökülür, Claude drama/itiraf/tartışma/duyuru/komik söz gibi konuşulacak anları seçer.
+        Ekran kartı yoksa 6 saatlik yayında döküm ~1 saat sürebilir (bir kez yapılır, kaydedilir).</div>
       <div class="row">
-        <div><label>Mod</label>
-          <select name="mode">
-            <option value="highlights">En hareketli anlar</option>
-            <option value="split">Sırayla parçala</option>
-          </select></div>
+        <input type="hidden" name="mode" value="highlights">
         <div><label>Klip sayısı</label><input name="max_clips" type="number" min="1" max="100" value="{{ d.max_clips }}"></div>
       </div>
       <div class="row">
@@ -302,6 +306,16 @@ function setTab(t){
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
 try { setTab(localStorage.getItem('kc_tab') || 'short'); } catch(e) { setTab('short'); }
 
+const selHints = {
+  viral: 'Tüm yayın yazıya dökülür, Claude drama/itiraf/tartışma/duyuru/komik söz gibi konuşulacak anları seçer. Ekran kartı yoksa 6 saatlik yayında döküm ~1 saat sürebilir (bir kez yapılır, kaydedilir).',
+  tepki: 'Sesten gülme/bağırma/heyecan anları bulunur, sadece onlar yazıya dökülüp değerlendirilir. Çok daha hızlı.',
+  split: 'Yayın eşit parçalara bölünür, seçim yapılmaz.',
+};
+$('#selsel').onchange = () => {
+  const v = $('#selsel').value;
+  $('#selhint').textContent = selHints[v];
+  form.mode.value = v === 'split' ? 'split' : 'highlights';
+};
 $('#cancel').onclick = () => current && fetch(`/api/jobs/${current}/cancel`, {method:'POST'});
 $('#refresh').onclick = () => loadLibrary();
 $('#refresh2').onclick = () => loadSections();

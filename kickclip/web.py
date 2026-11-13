@@ -90,6 +90,7 @@ def create_job():
         live_minutes=_num(f.get("live_minutes"), float, d.live_minutes),
         download=f.get("download", d.download) if f.get("download") in ("stream", "full") else d.download,
         ai=bool(f.get("ai", True)),
+        selection="tepki" if f.get("selection") == "tepki" else "viral",
         resolution="1080p" if f.get("resolution") == "1080p" else "4k",
         cam=(f.get("cam") or "auto").strip(),
         cam_ratio=_num(f.get("cam_ratio"), float, d.cam_ratio),

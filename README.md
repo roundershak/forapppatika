@@ -182,6 +182,18 @@ YouTube, uygulamaların video yükleyebilmesi için senin adına bir "Google Clo
 **Yazı tipi:** varsayılan `Montserrat ExtraBold`. İstediğin `.ttf`/`.otf` dosyasını `assets/fonts/` içine koyup
 `--font "Yazı Tipi Adı"` ile seçebilirsin. Bulunamazsa sistemdeki benzer bir font kullanılır.
 
+## Klip seçim modları (Shorts sekmesi)
+
+| Mod | Ne bulur | Nasıl | Süre (6 saatlik yayın) |
+|---|---|---|---|
+| **🔥 Viral anlar** (varsayılan) | Konuşulacak önemli anlar: drama, ifşa, itiraf, tartışma, olay yaratacak görüş, duyuru, hikâye, komik söz, büyük tepki | Yayının **tamamı** Whisper ile yazıya dökülür, Claude tüm dökümü okuyup seçer (ses tepkileri ipucu olarak verilir). Her klibin neden seçildiği ve "hook" cümlesi kartta görünür | Döküm: GPU 5-10 dk · CPU `small` ~1-1.5 saat · CPU `base` ~30-40 dk (bir kez yapılır, kaydedilir) + Claude 1-3 dk (~0.5 $) |
+| **😂 Tepki anları** | Gülme, bağırma, ani heyecan | Ses analiziyle adaylar bulunur, sadece adaylar yazıya dökülüp Claude'a sorulur | 10-20 dk |
+| **✂️ Sırayla parçala** | — | Eşit parçalar | birkaç dk |
+
+İpucu: Ekran kartın yoksa viral mod için Gelişmiş ayarlar → Whisper modeli **base** seç; ya da önce `--range` ile
+yayının bir kısmını dene. Aynı yayından tekrar klip çıkarırken döküm yeniden yapılmaz.
+Komut satırı: `--select viral` / `--select tepki`.
+
 ## Nasıl çalışır?
 
 **Yayını indirmez.** Kick linkini verdiğinde yayın bilgisayarına indirilmez; Kick'in video akışından (HLS) okunur:

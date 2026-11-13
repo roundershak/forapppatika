@@ -68,6 +68,13 @@ def run_pipeline(cfg: ClipConfig, log: Logger = default_log, progress: Optional[
         segs = split_segments(None, src.start, src.end, clip_len, cfg.max_clips, log)
     elif cfg.mode == "split":
         segs = split_segments(feats, src.start, src.end, clip_len, cfg.max_clips, log)
+    elif cfg.ai and cfg.selection == "viral" and transcriber is not None:
+        from .viral import rank_viral, transcribe_all
+        t0 = time.time()
+        all_words = transcribe_all(src, transcriber, cfg.work_dir, log, should_stop)
+        log(f"Döküm {time.time() - t0:.0f} sn sürdü ({len(all_words)} kelime).")
+        prog(0.38)
+        segs = rank_viral(src, feats, all_words, cfg.max_clips, clip_len, cfg.flex_length, log)
     else:
         k = cfg.ai_candidates or max(cfg.max_clips + 3, int(cfg.max_clips * 2.5))
         k = k if cfg.ai else cfg.max_clips

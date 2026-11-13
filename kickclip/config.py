@@ -23,6 +23,8 @@ class ClipConfig:
     max_clips: int = 10
     lead_ratio: float = 0.65            # highlight anı klibin yüzde kaçında olsun (öncesindeki gerilim)
     ai: bool = True                     # adayları Whisper + Claude ile değerlendir
+    selection: str = "viral"            # viral: tüm yayını yazıya dök, Claude önemli/viral anları seçsin
+                                        # tepki: sadece ses tepkisi (gülme/bağırma) adaylarını değerlendir (hızlı)
     ai_candidates: int = 0              # değerlendirilecek aday sayısı (0 = klip sayısı x 2.5)
     ai_window: float = 0.0              # aday başına incelenen pencere (sn, 0 = klip süresi x 2, en az 45)
     flex_length: bool = True            # AI klip süresini ±%50 esnetebilsin (olayın tamamını almak için)
