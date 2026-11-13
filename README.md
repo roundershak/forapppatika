@@ -234,6 +234,28 @@ Canlı yayında akış henüz bitmediği için belirtilen süre (`--live-minutes
 
 Hızlandırmak için: `--range` ile aralık seç, `--model base`, `--candidates 15`.
 
+## ☁️ Bulutta çalıştırma (bilgisayar gerekmez, ücretsiz)
+
+Klipler GitHub'ın ücretsiz bulut makinesinde üretilip **doğrudan YouTube'a** yüklenir; bilgisayarına hiçbir şey
+inmez, bilgisayarın kapalı bile olabilir. (Herkese açık depolarda GitHub Actions ücretsiz ve sınırsızdır;
+bir çalıştırma en fazla ~6 saat sürebilir. Bulut makinesinde ekran kartı yok, işlemciyle çalışır.)
+
+**Bir kerelik kurulum** (GitHub'da depo sayfası → **Settings → Secrets and variables → Actions → New repository secret**):
+| Secret adı | İçeriği |
+|---|---|
+| `YT_TOKEN` | Bilgisayarında KickClip'te YouTube'u bağladıktan sonra klasörde oluşan **youtube_token.json** dosyasının **tüm içeriği** (Not Defteri ile aç, kopyala, yapıştır) |
+| `ANTHROPIC_API_KEY` | Claude anahtarın (isteğe bağlı ama önerilir) |
+
+YouTube izninin 7 günde bir dolmaması için: Google Cloud → Google Auth Platform → **Kitle → Uygulamayı yayınla**.
+
+**Kullanım:** depo sayfası → **Actions → KickClip Bulut → Run workflow** → linki yapıştır, *shorts* ya da
+*uzun-video* seç → **Run workflow**. (Telefondaki GitHub uygulamasından da çalışır.) Bitince çalıştırmanın
+özet sayfasında başlıklar ve YouTube linkleri tablo olarak görünür. Varsayılan olarak videolar **özel**
+yüklenir; YouTube Studio'dan beğendiklerini herkese açık yaparsın.
+
+Notlar: YouTube API günde ~6 yüklemeye izin verir. Kick bulut sunucularını engellerse çalıştırma "bağlantı"
+hatasıyla biter (o durumda bilgisayardan kullan). Tokenın GitHub'da şifreli saklanır, loglarda görünmez.
+
 ## Ekran kartı (NVIDIA)
 
 NVIDIA kartın varsa `baslat.bat` bunu görür ve ilk açılışta Whisper'ın ekran kartında çalışması için gereken CUDA

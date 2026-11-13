@@ -50,6 +50,11 @@ def _credentials():
             creds.refresh(Request())
         except Exception:
             creds = None
+    if (not creds or not creds.valid) and os.environ.get("CI"):
+        raise YouTubeSetupError(
+            "Bulutta YouTube bağlantısı geçersiz ya da süresi dolmuş. Bilgisayarında KickClip'te YouTube'u yeniden "
+            "bağla, sonra youtube_token.json dosyasının içeriğini GitHub'da YT_TOKEN secret'ına tekrar yapıştır. "
+            "(Google Auth Platform -> Kitle -> 'Uygulamayı yayınla' dersen 7 günde bir dolmaz.)")
     if not creds or not creds.valid:
         if not os.path.exists(CLIENT_SECRET):
             raise YouTubeSetupError(

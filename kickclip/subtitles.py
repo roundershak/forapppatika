@@ -31,6 +31,22 @@ def _quiet_hf() -> None:
         pass
 
 
+_HALLU = re.compile(
+    r"(altyaz[ıi]\s*(m\.?\s*k\.?|by|:)|alt yaz[ıi]|abone olmay[ıi] unutma|izledi[gğ]iniz i[cç]in te[sş]ekk|"
+    r"bir sonraki videoda g[oö]r[uü][sş]mek|videoyu be[gğ]en|kanal[ıi]ma abone|subtitles by|"
+    r"amara\.org|thank you for watching|www\.|\.com|♪)", re.I)
+
+
+def _hallucination(text: str, no_speech_prob: float = 0.0) -> bool:
+    """Whisper'ın sessizlik/müzikte uydurduğu kalıplar (ör. 'Altyazı M.K.', 'Abone olmayı unutmayın')."""
+    t = (text or "").strip()
+    if not t:
+        return True
+    if _HALLU.search(t):
+        return True
+    return no_speech_prob > 0.8 and len(t.split()) <= 4
+
+
 def _is_gpu_error(e: Exception) -> bool:
     m = str(e).lower()
     return any(k in m for k in ("cublas", "cudnn", "cuda", "cudart", ".dll", "libcu", "nvrtc", "gpu"))
@@ -134,6 +150,8 @@ class Transcriber:
         )
         out: list[Word] = []
         for seg in segments:
+            if _hallucination(seg.text, getattr(seg, "no_speech_prob", 0.0)):
+                continue
             for w in seg.words or []:
                 txt = w.word.strip()
                 if not txt:
