@@ -1,0 +1,16 @@
+{
+  "duration": 30.0,
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "narration": [
+    { "id": "s1", "start": 0.25 },
+    { "id": "s2", "start": 4.10 },
+    { "id": "s3", "start": 8.20 },
+    { "id": "s4", "start": 12.85 },
+    { "id": "s5", "start": 16.25 },
+    { "id": "s6", "start": 20.15 },
+    { "id": "s7", "start": 24.50 }
+  ],
+  "highlight": ["ev", "çatı", "çatıyı", "Yağmur!", "duvarları", "hazırım!", "sığacağım?", "unuttum!", "pencereleri", "sabır!", "Tebrikler,", "inşa", "ıslanmak", "yok!"]
+}

@@ -1,2 +1,6 @@
 out/
 __pycache__/
+node_modules/
+animasyon/*/frames/
+animasyon/*/build/stems/
+animasyon/*/build/*.wav

@@ -1,0 +1,17 @@
+{
+  "name": "ev-yapiyoruz",
+  "version": "1.0.0",
+  "description": "Sıfırdan Ev Yapıyoruz — 30 sn dikey 3D animasyon",
+  "scripts": {
+    "render": "node render.mjs --out frames --workers 4",
+    "audio": "python3 build_audio.py",
+    "subs": "python3 build_subs.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "private": true
+}
