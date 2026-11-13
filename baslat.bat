@@ -95,10 +95,21 @@ echo [3/4] ffmpeg bulundu.
 rem --- Baslat ---
 echo [4/4] Arayuz aciliyor, tarayici birazdan acilacak...
 echo.
-"%VPY%" -m kickclip web --open
-if errorlevel 1 goto :fail
-pause
-exit /b 0
+set "KICKCLIP_LAUNCHER=2"
+rem Asagidaki blok tek parca okunur; guncelleme bu dosyayi degistirse bile guvenle yeniden baslatir.
+(
+  "%VPY%" -m kickclip web --open
+  if errorlevel 3 if not errorlevel 4 (
+    echo.
+    echo Guncelleme yuklendi, KickClip yeniden baslatiliyor...
+    set "KICKCLIP_NO_OPEN=1"
+    start "KickClip" "%~f0"
+    exit
+  )
+  if errorlevel 1 goto :fail
+  pause
+  exit /b 0
+)
 
 :fail
 echo.

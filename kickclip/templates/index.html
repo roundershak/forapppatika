@@ -68,6 +68,7 @@
   .row3 { display:grid; grid-template-columns:1fr 1fr 70px; gap:8px; align-items:end; }
   .hide { display:none !important; }
   .ytbtn { border-color:#ff0033 !important; color:#fff !important; }
+  .upbtn { border-color:#5aa9ff !important; color:#fff !important; background:#12304f; }
   .ytbtn.ok { background:#1a2a1a; border-color:var(--accent) !important; }
   .modal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:flex; align-items:flex-start; justify-content:center; z-index:50; overflow:auto; padding:40px 16px; }
   .mbox { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px 24px; max-width:620px; width:100%; position:relative; }
@@ -90,6 +91,7 @@
   <nav class="tabs">
     <button class="tab on" data-tab="short">📱 Shorts Klipler</button>
     <button class="tab" data-tab="long">🎬 Uzun Videolar</button>
+    <button class="tab upbtn hide" id="upbtn" title="">⬆ Güncelleme var</button>
     <button class="tab ytbtn" id="ytbtn">▶ YouTube'u bağla</button>
   </nav>
 </header>
@@ -595,8 +597,44 @@ async function loadSections(){
   return running;
 }
 
+// ------------------------------------------------------------ uygulama güncelleme
+async function checkUpdate(){
+  try {
+    const u = await (await fetch('/api/update/check')).json();
+    const b = $('#upbtn');
+    b.classList.toggle('hide', !u.available);
+    if (u.available && u.latest) b.title = 'Yeni: ' + u.latest.message;
+    b.onclick = async () => {
+      if (!confirm('Yeni sürüm yüklensin mi?\n\n' + (u.latest ? u.latest.message : '') +
+                   '\n\nKliplerin, ayarların ve YouTube bağlantın korunur.')) return;
+      const r = await fetch('/api/update/apply', {method:'POST'});
+      if (!r.ok) { alert((await r.json()).error || 'Hata'); return; }
+      b.disabled = true; b.textContent = '⏳ Güncelleniyor...';
+      waitUpdate(u.auto_restart);
+    };
+  } catch(e) {}
+}
+async function waitUpdate(auto){
+  let st;
+  try {
+    const r = await fetch('/api/update/check');
+    if (!r.ok) { location.reload(); return; }
+    st = await r.json();
+  } catch(e) { setTimeout(() => waitUpdate(auto), 1500); return; }
+  const s = st.state || {};
+  if (s.status === 'error') { alert('Güncelleme başarısız: ' + s.error); location.reload(); return; }
+  if (s.status === 'running') { $('#upbtn').textContent = '⏳ ' + ((s.log||[]).slice(-1)[0] || 'Güncelleniyor...'); setTimeout(() => waitUpdate(auto), 1000); return; }
+  if (s.status === 'done') {
+    if (!auto) { alert('Güncellendi! Siyah pencereyi kapatıp baslat.bat ile tekrar aç.'); return; }
+    setTimeout(() => waitUpdate(auto), 1500); return;   // sunucu yeniden başlıyor
+  }
+  // yeni süreç ayağa kalktı (durum sıfırlandı)
+  location.reload();
+}
+
 ytInfo();
 watchUploads();
+checkUpdate();
 </script>
 </body>
 </html>

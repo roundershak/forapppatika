@@ -154,6 +154,15 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(1)
         return
     _load_env()
+    if argv and argv[0] == "guncelle":
+        from . import updater
+        info = updater.check()
+        if not info.get("available"):
+            print(info.get("error") or "Zaten en güncel sürüm.")
+            return
+        res = updater.apply()
+        print(f"Güncellendi: {res['message']} ({res['changed_files']} dosya)")
+        return
     if argv and argv[0] == "uzun":
         lp = argparse.ArgumentParser(prog="kickclip uzun", description="Video izleme bölümlerini bul (uzun video)")
         lp.add_argument("source")

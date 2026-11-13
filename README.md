@@ -70,6 +70,10 @@ Windows'ta `baslat.bat` dosyasına çift tıklaman yeterli. İlk çalıştırmad
 - ffmpeg yoksa `winget` ile kurar (sonra baslat.bat'i bir kez daha çalıştır),
 - arayüzü başlatıp tarayıcıyı açar. Sonraki açılışlar birkaç saniye sürer.
 
+**Güncelleme:** Yeni sürüm çıkınca arayüzün sağ üstünde mavi **⬆ Güncelleme var** butonu çıkar; basınca
+uygulama kendini GitHub'dan günceller ve yeniden başlar. Kliplerin, `.env`, `client_secret.json` ve YouTube
+bağlantın korunur. (Komut satırı: `python -m kickclip guncelle`.)
+
 ZIP olarak indirdiysen önce **"Tümünü ayıkla"** ile klasöre çıkar; ZIP'in içinden çalıştırma.
 
 Claude anahtarını her seferinde yazmamak için `.env.ornek` dosyasının adını `.env` yapıp içine

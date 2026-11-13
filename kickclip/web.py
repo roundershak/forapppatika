@@ -370,6 +370,44 @@ def download_section_ep(run, name):
     return _section_task(run, name, request.get_json(force=True) or {}, False)
 
 
+# ---------------------------------------------------------------- uygulama güncelleme
+UPDATE: dict = {"status": "idle", "log": [], "error": None, "result": None}
+
+
+@app.get("/api/update/check")
+def update_check():
+    from . import updater
+    info = updater.check()
+    info["state"] = UPDATE
+    info["auto_restart"] = os.environ.get("KICKCLIP_LAUNCHER") == "2"
+    return jsonify(info)
+
+
+@app.post("/api/update/apply")
+def update_apply():
+    from . import updater
+    if UPDATE["status"] == "running":
+        return jsonify(ok=True)
+    if any(j["status"] in ("queued", "running") for j in JOBS.values()) or \
+            any(u.get("status") == "running" for u in UPLOADS.values()):
+        return jsonify(error="Devam eden bir iş/yükleme var. Bitince güncelle."), 409
+    UPDATE.update(status="running", log=[], error=None, result=None)
+
+    def work():
+        try:
+            res = updater.apply(log=lambda m: UPDATE["log"].append(m))
+            UPDATE.update(status="done", result=res)
+            if os.environ.get("KICKCLIP_LAUNCHER") == "2":
+                # baslat.bat/sh çıkış kodu 3'ü görünce uygulamayı yeni kodla yeniden açar
+                threading.Timer(1.5, lambda: os._exit(3)).start()
+        except Exception as e:
+            traceback.print_exc()
+            UPDATE.update(status="error", error=str(e))
+
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify(ok=True)
+
+
 @app.get("/api/youtube/status")
 def yt_status():
     return jsonify(client_secret=youtube.has_client_secret(), authorized=youtube.is_authorized(),
@@ -454,7 +492,7 @@ def serve(host: str = "127.0.0.1", port: int = 7860, open_browser: bool = False)
     print("  Tarayıcı açılmazsa bu adresi kendin aç.")
     print("  Kapatmak için bu pencereyi kapat (veya Ctrl+C).")
     print("=" * 52, flush=True)
-    if open_browser:
+    if open_browser and not os.environ.get("KICKCLIP_NO_OPEN"):
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     app.run(host=host, port=port, debug=False, threaded=True)
