@@ -113,7 +113,15 @@ def has_client_secret() -> bool:
 def upload_short(video_path: str, title: str, description: str = "", tags: Optional[list[str]] = None,
                  privacy: str = "public", publish_at: Optional[str] = None, category_id: str = "20",
                  log: Logger = default_log) -> dict:
-    """Videoyu yükler. publish_at: RFC3339 (ör. 2026-11-20T18:00:00+03:00) -> zamanlanmış yayın."""
+    """Shorts yükler. publish_at: RFC3339 (ör. 2026-11-20T18:00:00+03:00) -> zamanlanmış yayın."""
+    return upload_video(video_path, title, description, tags, privacy, publish_at, category_id,
+                        shorts=True, log=log)
+
+
+def upload_video(video_path: str, title: str, description: str = "", tags: Optional[list[str]] = None,
+                 privacy: str = "public", publish_at: Optional[str] = None, category_id: str = "24",
+                 shorts: bool = False, thumbnail: Optional[str] = None, log: Logger = default_log) -> dict:
+    """Videoyu yükler; thumbnail verilirse kapak olarak ayarlar."""
     from googleapiclient.discovery import build
     from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
@@ -130,8 +138,8 @@ def upload_short(video_path: str, title: str, description: str = "", tags: Optio
         status["publishAt"] = publish_at
     body = {
         "snippet": {
-            "title": ensure_shorts_title(title),
-            "description": description or "#shorts",
+            "title": ensure_shorts_title(title) if shorts else ((title or "").strip() or "Yayın")[:100],
+            "description": description or ("#shorts" if shorts else ""),
             "tags": [t for t in (tags or []) if t][:30],
             "categoryId": category_id,  # 20 = Oyun
         },
@@ -154,6 +162,19 @@ def upload_short(video_path: str, title: str, description: str = "", tags: Optio
             raise RuntimeError("Kanalın günlük yükleme limiti doldu.") from e
         raise RuntimeError(f"YouTube hatası: {msg[:400]}") from e
     vid = resp["id"]
-    url = f"https://youtube.com/shorts/{vid}"
+    url = f"https://youtube.com/shorts/{vid}" if shorts else f"https://youtu.be/{vid}"
     log(f"Yüklendi: {url}")
-    return {"id": vid, "url": url, "privacy": status["privacyStatus"], "publish_at": publish_at}
+    result = {"id": vid, "url": url, "privacy": status["privacyStatus"], "publish_at": publish_at}
+    if thumbnail and os.path.isfile(thumbnail):
+        try:
+            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(thumbnail, mimetype="image/jpeg")).execute()
+            log("Kapak fotoğrafı ayarlandı.")
+            result["thumbnail_set"] = True
+        except HttpError as e:
+            msg = e.content.decode("utf-8", "replace") if hasattr(e, "content") else str(e)
+            hint = (" Özel kapak için kanalın telefonla doğrulanmış olmalı: youtube.com/verify"
+                    if "forbidden" in msg.lower() or "403" in str(e) else "")
+            log(f"Kapak ayarlanamadı: {msg[:200]}{hint}")
+            result["thumbnail_set"] = False
+            result["thumbnail_error"] = msg[:300] + hint
+    return result

@@ -13,6 +13,8 @@ from flask import Flask, abort, jsonify, render_template, request, send_from_dir
 
 from . import library, youtube
 from .config import ClipConfig
+from .longform import LongConfig, make_cover, run_longform, source_for, upload_section, export
+from .utils import parse_time, fmt_time
 from .pipeline import run_pipeline
 from .titles import generate_title
 
@@ -45,8 +47,12 @@ def _worker():
                 job["clips"] += 1
 
         try:
-            run_pipeline(job["config"], log=log, progress=prog, on_clip=on_clip,
-                         should_stop=lambda job=job: job["cancel"])
+            if job.get("kind") == "long":
+                run_longform(job["config"], log=log, progress=prog, on_section=on_clip,
+                             should_stop=lambda job=job: job["cancel"])
+            else:
+                run_pipeline(job["config"], log=log, progress=prog, on_clip=on_clip,
+                             should_stop=lambda job=job: job["cancel"])
             job["status"] = "cancelled" if job["cancel"] else "done"
         except Exception as e:
             log(f"HATA: {e}")
@@ -103,6 +109,30 @@ def create_job():
     )
     jid = uuid.uuid4().hex[:10]
     JOBS[jid] = {"id": jid, "status": "queued", "progress": 0.0, "logs": [], "clips": 0,
+                 "error": None, "cancel": False, "config": cfg, "source": src, "created": time.time()}
+    QUEUE.put(jid)
+    return jsonify(id=jid)
+
+
+@app.post("/api/longjobs")
+def create_longjob():
+    f = request.get_json(force=True) or {}
+    src = (f.get("source") or "").strip()
+    if not src:
+        return jsonify(error="Link boş olamaz"), 400
+    d = LongConfig()
+    cfg = LongConfig(
+        source=src, output_dir=OUTPUT_DIR, work_dir=WORK_DIR,
+        time_range=(f.get("time_range") or "").strip() or None,
+        min_minutes=_num(f.get("min_minutes"), float, d.min_minutes),
+        max_minutes=_num(f.get("max_minutes"), float, d.max_minutes),
+        merge_gap=_num(f.get("merge_gap"), float, d.merge_gap),
+        split_by_video=bool(f.get("split_by_video", True)),
+        manual=f.get("manual") or "",
+        streamer=(f.get("streamer") or "").strip() or None,
+    )
+    jid = uuid.uuid4().hex[:10]
+    JOBS[jid] = {"id": jid, "kind": "long", "status": "queued", "progress": 0.0, "logs": [], "clips": 0,
                  "error": None, "cancel": False, "config": cfg, "source": src, "created": time.time()}
     QUEUE.put(jid)
     return jsonify(id=jid)
@@ -213,6 +243,130 @@ def upload_clip(run, name):
 
 
 YT_CONNECT: dict = {"status": "idle", "error": None}
+
+
+# ---------------------------------------------------------------- uzun video bölümleri
+def _public_section(m: dict) -> dict:
+    key = f"{m['run']}/{m['name']}"
+    thumb = None
+    tp = os.path.join(OUTPUT_DIR, m["run"], f"{m['name']}.jpg")
+    if os.path.isfile(tp):
+        thumb = f"/media/{m['run']}/{m['name']}.jpg?v={int(os.path.getmtime(tp))}"
+    mp4 = os.path.join(OUTPUT_DIR, m["run"], f"{m['name']}.mp4")
+    return {
+        "key": key, "run": m["run"], "name": m["name"], "title": m.get("title", ""),
+        "description": m.get("description", ""), "tags": m.get("tags", []),
+        "thumb_text": m.get("thumb_text", ""), "watched": m.get("watched", ""),
+        "start_hms": fmt_time(m.get("start", 0)), "end_hms": fmt_time(m.get("end", 0)),
+        "minutes": round((m.get("end", 0) - m.get("start", 0)) / 60, 1),
+        "thumb": thumb, "youtube": m.get("youtube"), "upload": UPLOADS.get(key),
+        "file": f"/media/{m['run']}/{m['name']}.mp4" if os.path.isfile(mp4) and not UPLOADS.get(key, {}).get(
+            "status") == "running" else None,
+    }
+
+
+@app.get("/api/sections")
+def get_sections():
+    return jsonify([_public_section(m) for m in library.list_sections(OUTPUT_DIR)])
+
+
+def _apply_section_edits(meta: dict, f: dict) -> None:
+    _apply_edits(meta, f)
+    if "thumb_text" in f:
+        meta["thumb_text"] = str(f["thumb_text"])[:60]
+    try:
+        if f.get("start_hms"):
+            meta["start"] = parse_time(f["start_hms"])
+        if f.get("end_hms"):
+            meta["end"] = parse_time(f["end_hms"])
+    except ValueError:
+        pass
+    if meta["end"] <= meta["start"]:
+        raise ValueError("Bitiş, başlangıçtan sonra olmalı")
+
+
+@app.post("/api/sections/<run>/<name>")
+def update_section(run, name):
+    meta = _clip_or_404(run, name)
+    try:
+        _apply_section_edits(meta, request.get_json(force=True) or {})
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    library.save_clip(OUTPUT_DIR, meta)
+    return jsonify(_public_section(meta))
+
+
+@app.post("/api/sections/<run>/<name>/cover")
+def recover_section(run, name):
+    meta = _clip_or_404(run, name)
+    f = request.get_json(force=True) or {}
+    try:
+        _apply_section_edits(meta, f)
+        if f.get("new_background"):
+            # bölüm içinden farklı bir sahne dene
+            import random
+            meta["background_time"] = meta["start"] + (meta["end"] - meta["start"]) * random.uniform(0.1, 0.9)
+            meta["player_box"] = []
+        src = source_for(meta, WORK_DIR, log=lambda m: None)
+        out = os.path.join(OUTPUT_DIR, run, f"{name}.jpg")
+        make_cover(src, meta, meta.get("cam"), out)
+        meta["thumbnail"] = out
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify(error=f"Kapak oluşturulamadı: {e}"), 500
+    library.save_clip(OUTPUT_DIR, meta)
+    return jsonify(_public_section(meta))
+
+
+def _section_task(run, name, f, do_upload: bool):
+    meta = _clip_or_404(run, name)
+    key = f"{run}/{name}"
+    if UPLOADS.get(key, {}).get("status") == "running":
+        return jsonify(error="Bu bölüm için zaten bir işlem sürüyor"), 409
+    if do_upload:
+        if meta.get("youtube") and not f.get("force"):
+            return jsonify(error="Bu bölüm zaten yüklendi", youtube=meta["youtube"]), 409
+        if not youtube.is_authorized():
+            return jsonify(error="Önce YouTube'u bağla (sağ üstteki buton)"), 400
+    try:
+        _apply_section_edits(meta, f)
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    library.save_clip(OUTPUT_DIR, meta)
+    state = {"status": "running", "log": [], "url": None, "error": None,
+             "action": "upload" if do_upload else "download"}
+    UPLOADS[key] = state
+    lg = lambda m: state["log"].append(m)  # noqa: E731
+
+    def work():
+        try:
+            if do_upload:
+                res = upload_section(meta, WORK_DIR, f.get("privacy", "public"),
+                                     (f.get("publish_at") or "").strip() or None, log=lg)
+                fresh = library.load_clip(OUTPUT_DIR, run, name) or meta
+                fresh["youtube"] = {**res, "uploaded_at": time.strftime("%Y-%m-%d %H:%M")}
+                library.save_clip(OUTPUT_DIR, fresh)
+                state.update(status="done", url=res["url"])
+            else:
+                src = source_for(meta, WORK_DIR, lg)
+                export(src, meta["start"], meta["end"], os.path.join(OUTPUT_DIR, run, f"{name}.mp4"), lg)
+                state.update(status="done")
+        except Exception as e:
+            traceback.print_exc()
+            state.update(status="error", error=str(e))
+
+    threading.Thread(target=work, daemon=True).start()
+    return jsonify(ok=True)
+
+
+@app.post("/api/sections/<run>/<name>/upload")
+def upload_section_ep(run, name):
+    return _section_task(run, name, request.get_json(force=True) or {}, True)
+
+
+@app.post("/api/sections/<run>/<name>/download")
+def download_section_ep(run, name):
+    return _section_task(run, name, request.get_json(force=True) or {}, False)
 
 
 @app.get("/api/youtube/status")

@@ -152,6 +152,28 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(1)
         return
     _load_env()
+    if argv and argv[0] == "uzun":
+        lp = argparse.ArgumentParser(prog="kickclip uzun", description="Video izleme bölümlerini bul (uzun video)")
+        lp.add_argument("source")
+        lp.add_argument("--range", dest="time_range", default=None)
+        lp.add_argument("--min", type=float, default=4.0, help="en kısa bölüm (dk)")
+        lp.add_argument("--max", type=float, default=40.0, help="en uzun bölüm (dk)")
+        lp.add_argument("--manual", default="", help="elle aralıklar, ör. '1:02:00-1:25:00 Madara Olduk'")
+        lp.add_argument("--streamer", default=None)
+        lp.add_argument("-o", "--output", default="output")
+        la = lp.parse_args(argv[1:])
+        from .longform import LongConfig, run_longform
+        try:
+            secs = run_longform(LongConfig(source=la.source, output_dir=la.output, time_range=la.time_range,
+                                           min_minutes=la.min, max_minutes=la.max, manual=la.manual.replace(";", "\n"),
+                                           streamer=la.streamer))
+        except Exception as e:
+            print(f"HATA: {e}", file=sys.stderr)
+            sys.exit(1)
+        for s_ in secs:
+            print(f"  {s_['start_hms']}-{s_['end_hms']}  {s_['title']}")
+        print("\nYüklemek için web arayüzünü kullan: python -m kickclip web")
+        return
     if argv and argv[0] == "web":
         from .web import serve
         nums = [a for a in argv[1:] if a.isdigit()]

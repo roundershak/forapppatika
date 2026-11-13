@@ -50,6 +50,23 @@
   .banner { font-size:12px; color:var(--muted); background:#0e1115; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:12px; }
   .banner b { color:var(--text); }
   h2 { font-size:15px; margin:22px 0 0; display:flex; justify-content:space-between; align-items:center; }
+  .tabs { display:flex; gap:6px; margin-left:auto; }
+  .tab { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:8px 16px; margin:0; width:auto; font-size:14px; font-weight:600; }
+  .tab.on { background:var(--accent); color:#071003; border-color:var(--accent); }
+  @media (max-width:700px){ header { flex-wrap:wrap; } .tabs { margin-left:0; width:100%; } .tab { flex:1; } }
+  .lgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(400px,1fr)); gap:16px; margin-top:16px; }
+  @media (max-width:700px){ .lgrid { grid-template-columns:1fr; } }
+  .sec { background:#0e1115; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .sec img { width:100%; aspect-ratio:16/9; display:block; background:#000; object-fit:cover; }
+  .sec .meta { padding:10px 12px; font-size:12px; color:var(--muted); }
+  .sec .meta b { color:var(--text); }
+  .sec input, .sec select { padding:6px 8px; font-size:13px; }
+  .sec .acts { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .sec .acts button { flex:1; margin:0; padding:7px 6px; font-size:12px; }
+  .sec .yt { margin-top:8px; font-size:12px; word-break:break-word; }
+  .sec .yt a { color:#ff4e45; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 70px; gap:8px; align-items:end; }
+  .hide { display:none !important; }
   .empty { color:var(--muted); text-align:center; padding:40px 0; }
   .err { color:var(--err); }
 </style>
@@ -58,11 +75,15 @@
 <header>
   <div>
     <h1>Kick<span>Clip</span></h1>
-    <p>Yayın linkini yapıştır → otomatik dikey klipler (kamera üstte, ekran altta, altyazı, zil + blur giriş)</p>
+    <p id="subtitle">Yayın linkini yapıştır → otomatik dikey klipler (kamera üstte, ekran altta, altyazı, zil + blur giriş)</p>
   </div>
+  <nav class="tabs">
+    <button class="tab on" data-tab="short">📱 Shorts Klipler</button>
+    <button class="tab" data-tab="long">🎬 Uzun Videolar</button>
+  </nav>
 </header>
 <main>
-  <section class="card">
+  <section class="card" id="pane-short">
     <form id="f">
       <label>Kick linki veya dosya yolu</label>
       <input name="source" placeholder="https://kick.com/kanal/videos/..." required>
@@ -147,16 +168,47 @@
     </form>
   </section>
 
+  <section class="card hide" id="pane-long">
+    <form id="lf">
+      <label>Kick yayın (VOD) linki</label>
+      <input name="source" placeholder="https://kick.com/kanal/videos/..." required>
+      <div class="hint">Yayıncının video izlediği (react) kısımlar bulunur; her biri ayrı YouTube videosu olur.
+        Kapak, başlık ve açıklama otomatik hazırlanır. Kalite: orijinal 1080p, yeniden kodlama yok.</div>
+      <div class="row">
+        <div><label>En kısa bölüm (dk)</label><input name="min_minutes" type="number" min="1" value="4"></div>
+        <div><label>En uzun bölüm (dk)</label><input name="max_minutes" type="number" min="5" value="40"></div>
+      </div>
+      <div class="row">
+        <div><label>Zaman aralığı</label><input name="time_range" placeholder="0:30:00-4:00:00"></div>
+        <div><label>Yayıncı adı</label><input name="streamer" placeholder="ör. Eray"></div>
+      </div>
+      <label class="check"><input type="checkbox" name="split_by_video" checked> İzlenen video değişince ayrı bölüm yap</label>
+      <details>
+        <summary>Elle aralık gir (Claude olmadan)</summary>
+        <textarea name="manual" rows="4" placeholder="1:02:00-1:25:30 Madara Olduk 129&#10;2:10:00-2:31:00 Komik videolar" style="margin-top:8px"></textarea>
+        <div class="hint">Doluysa otomatik tespit yapılmaz, bu aralıklar kullanılır.</div>
+      </details>
+      <button id="lgo" type="submit">İzleme bölümlerini bul</button>
+      <div class="hint" style="margin-top:10px">Süre: 6 saatlik yayında genelde 10-20 dk. Claude maliyeti yaklaşık 1 dolar.</div>
+    </form>
+  </section>
+
   <section class="card">
     <div class="status">
       <b id="st">Hazır</b>
       <button class="ghost" id="cancel" style="display:none">Durdur</button>
     </div>
     <div class="bar"><div id="pb"></div></div>
-    <pre id="log">Link yapıştırıp "Klipleri üret"e bas.</pre>
+    <pre id="log">Soldan yayın linkini ver ve başlat.</pre>
     <div class="banner" id="ytinfo"></div>
-    <h2>Klipler <button class="ghost" id="refresh">Yenile</button></h2>
-    <div class="grid" id="clips"><div class="empty">Henüz klip yok.</div></div>
+    <div id="list-short">
+      <h2>Klipler <button class="ghost" id="refresh">Yenile</button></h2>
+      <div class="grid" id="clips"><div class="empty">Henüz klip yok.</div></div>
+    </div>
+    <div id="list-long" class="hide">
+      <h2>Uzun videolar <button class="ghost" id="refresh2">Yenile</button></h2>
+      <div class="lgrid" id="secs"><div class="empty">Henüz bölüm yok.</div></div>
+    </div>
   </section>
 </main>
 <script>
@@ -186,8 +238,38 @@ form.addEventListener('submit', async e => {
   poll();
 });
 
+const lform = $('#lf');
+lform.addEventListener('submit', async e => {
+  e.preventDefault();
+  const body = Object.fromEntries(new FormData(lform).entries());
+  body.split_by_video = lform.split_by_video.checked;
+  $('#lgo').disabled = true;
+  const r = await fetch('/api/longjobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { alert(j.error || 'Hata'); $('#lgo').disabled = false; return; }
+  current = j.id;
+  poll();
+});
+
+const subtitles = {
+  short: 'Yayın linkini yapıştır → otomatik dikey klipler (kamera üstte, ekran altta, altyazı, zil + blur giriş)',
+  long: 'Yayıncının video izlediği bölümleri bul → kapak + başlık hazır → 1080p tek tıkla YouTube',
+};
+function setTab(t){
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('#pane-short').classList.toggle('hide', t !== 'short');
+  $('#list-short').classList.toggle('hide', t !== 'short');
+  $('#pane-long').classList.toggle('hide', t !== 'long');
+  $('#list-long').classList.toggle('hide', t !== 'long');
+  $('#subtitle').textContent = subtitles[t];
+  try { localStorage.setItem('kc_tab', t); } catch(e) {}
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+try { setTab(localStorage.getItem('kc_tab') || 'short'); } catch(e) { setTab('short'); }
+
 $('#cancel').onclick = () => current && fetch(`/api/jobs/${current}/cancel`, {method:'POST'});
 $('#refresh').onclick = () => loadLibrary();
+$('#refresh2').onclick = () => loadSections();
 
 function esc(s){ return (s??'').toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -203,11 +285,12 @@ async function poll(){
   const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
   log.textContent = j.logs.join('\n');
   if (atBottom) log.scrollTop = log.scrollHeight;
-  if (j.clips !== shown) { shown = j.clips; loadLibrary(); }
+  if (j.clips !== shown) { shown = j.clips; loadLibrary(); loadSections(); }
   const running = j.status === 'queued' || j.status === 'running';
   $('#cancel').style.display = running ? '' : 'none';
   $('#go').disabled = running;
-  if (running) timer = setTimeout(poll, 1500); else loadLibrary();
+  $('#lgo').disabled = running;
+  if (running) timer = setTimeout(poll, 1500); else { loadLibrary(); loadSections(); }
 }
 
 let ytTimer = null;
@@ -330,8 +413,110 @@ async function loadLibrary(){
 }
 async function watchUploads(){
   clearTimeout(upTimer);
-  if (await loadLibrary()) upTimer = setTimeout(watchUploads, 2000);
+  const a = await loadLibrary(), b = await loadSections();
+  if (a || b) upTimer = setTimeout(watchUploads, 2000);
   else ytInfo();
+}
+
+// ------------------------------------------------------------ uzun video bölüm kartları
+const scards = {};
+function secStatus(c){
+  const u = c.upload;
+  if (u && u.status === 'running') return `⏳ ${u.action === 'upload' ? 'Yükleniyor' : 'İndiriliyor'}... ${esc((u.log||[]).slice(-1)[0]||'')}`;
+  if (u && u.status === 'error') return `<span class="err">❌ ${esc(u.error)}</span>`;
+  let h = '';
+  if (c.youtube) h += `✅ <a href="${esc(c.youtube.url)}" target="_blank">${esc(c.youtube.url)}</a> (${esc(c.youtube.privacy)})`
+    + (c.youtube.thumbnail_error ? `<br><span class="err">Kapak: ${esc(c.youtube.thumbnail_error)}</span>` : '');
+  if (c.file) h += `${h ? '<br>' : ''}💾 <a href="${c.file}?dl=1" style="color:var(--accent)">Bilgisayara kaydet (mp4)</a>`;
+  return h;
+}
+function makeSec(c){
+  const el = document.createElement('div');
+  el.className = 'sec';
+  el.innerHTML = `<img alt="kapak">
+    <div class="meta">
+      <b>${esc(c.name)}</b> · <span class="dur"></span> ${c.watched ? '· 📺 ' + esc(c.watched) : ''}
+      <label>Başlık <span class="cnt" style="float:right"></span></label>
+      <input class="ttl" maxlength="100">
+      <div class="row3">
+        <div><label>Başlangıç</label><input class="st"></div>
+        <div><label>Bitiş</label><input class="en"></div>
+        <button class="ghost save" style="margin:0;padding:7px 4px;font-size:12px">Kaydet</button>
+      </div>
+      <label>Kapak yazısı</label>
+      <div style="display:flex;gap:6px"><input class="tt" maxlength="60">
+        <button class="ghost cov" style="margin:0;white-space:nowrap;font-size:12px">Kapağı yenile</button>
+        <button class="ghost bg" style="margin:0;white-space:nowrap;font-size:12px" title="Bölümden başka bir sahne seç">🎲 Sahne</button></div>
+      <label>Açıklama</label>
+      <textarea class="desc" rows="4"></textarea>
+      <label>Etiketler (virgülle)</label>
+      <input class="tags">
+      <div class="row" style="margin-top:6px">
+        <select class="priv"><option value="public">Herkese açık</option><option value="unlisted">Liste dışı</option><option value="private">Özel</option></select>
+        <input class="sched" type="datetime-local" title="Zamanla (boş = hemen)">
+      </div>
+      <div class="acts">
+        <button class="ghost dl">💾 Bilgisayara indir</button>
+        <button class="up btn-yt">YouTube'a yükle</button>
+      </div>
+      <div class="yt"></div>
+    </div>`;
+  const q = s => el.querySelector(s);
+  const fill = c => {
+    q('.ttl').value = c.title; q('.st').value = c.start_hms; q('.en').value = c.end_hms;
+    q('.tt').value = c.thumb_text; q('.desc').value = c.description; q('.tags').value = (c.tags||[]).join(', ');
+    q('.dur').textContent = `${c.start_hms} → ${c.end_hms} (${c.minutes} dk)`;
+    if (c.thumb) q('img').src = c.thumb;
+    q('.cnt').textContent = `${q('.ttl').value.length}/100`;
+  };
+  fill(c); el._fill = fill;
+  q('.ttl').addEventListener('input', () => q('.cnt').textContent = `${q('.ttl').value.length}/100`);
+  const fields = () => ({title:q('.ttl').value, description:q('.desc').value, tags:q('.tags').value,
+                         thumb_text:q('.tt').value, start_hms:q('.st').value, end_hms:q('.en').value});
+  const url = `/api/sections/${encodeURIComponent(c.run)}/${encodeURIComponent(c.name)}`;
+  const post = async (path, extra={}) => {
+    const r = await fetch(url + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...fields(), ...extra})});
+    const j = await r.json();
+    if (!r.ok) { alert(j.error || 'Hata'); return null; }
+    return j;
+  };
+  q('.save').onclick = async () => { const n = await post(''); if (n) { fill(n); q('.save').textContent = '✓'; setTimeout(() => q('.save').textContent = 'Kaydet', 1200); } };
+  const recover = async (btn, extra) => {
+    const old = btn.textContent; btn.disabled = true; btn.textContent = '...';
+    const n = await post('/cover', extra); if (n) fill(n);
+    btn.disabled = false; btn.textContent = old;
+  };
+  q('.cov').onclick = () => recover(q('.cov'), {});
+  q('.bg').onclick = () => recover(q('.bg'), {new_background: true});
+  q('.dl').onclick = async () => { if (await post('/download')) watchUploads(); };
+  q('.up').onclick = async () => {
+    const sched = q('.sched').value;
+    const extra = {privacy:q('.priv').value, publish_at: sched ? new Date(sched).toISOString() : ''};
+    if (el._yt) { if (!confirm('Bu bölüm zaten yüklendi. Tekrar yüklensin mi?')) return; extra.force = true; }
+    if (await post('/upload', extra)) { q('.yt').textContent = '⏳ Başlıyor...'; watchUploads(); }
+  };
+  return el;
+}
+async function loadSections(){
+  const list = await (await fetch('/api/sections')).json();
+  const grid = $('#secs');
+  if (!list.length) { grid.innerHTML = '<div class="empty">Henüz bölüm yok. Soldan yayın linkini ver.</div>'; return false; }
+  grid.querySelector('.empty')?.remove();
+  let running = false, prev = null;
+  for (const c of list) {
+    let el = scards[c.key];
+    if (!el) el = scards[c.key] = makeSec(c);
+    else if (c.thumb && el.querySelector('img').getAttribute('src') !== c.thumb) el.querySelector('img').src = c.thumb;
+    if (prev ? prev.nextSibling !== el : grid.firstChild !== el) { prev ? prev.after(el) : grid.prepend(el); }
+    prev = el;
+    el._yt = !!c.youtube;
+    el.querySelector('.yt').innerHTML = secStatus(c);
+    const busy = c.upload && c.upload.status === 'running';
+    el.querySelector('.up').disabled = busy; el.querySelector('.dl').disabled = busy;
+    el.querySelector('.up').textContent = c.youtube ? 'Tekrar yükle' : "YouTube'a yükle";
+    running = running || busy;
+  }
+  return running;
 }
 
 ytInfo();

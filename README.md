@@ -1,4 +1,4 @@
-# KickClip — Kick yayınlarından otomatik dikey klip üretici
+# KickClip — Kick yayınlarından otomatik Shorts klipleri ve uzun "react" videoları
 
 Kick yayın linkini ver, uygulama yayını parçalara bölüp **TikTok / Shorts / Reels** formatında (1080x1920) klipler üretsin:
 
@@ -13,6 +13,36 @@ Kick yayın linkini ver, uygulama yayını parçalara bölüp **TikTok / Shorts 
 - **Otomatik YouTube Shorts başlığı + açıklama + etiket** (konuşmaya göre; Claude ile ya da API anahtarı olmadan basit modda)
 - İstediğin klibi arayüzden **tek tıkla YouTube Shorts'a yükleme** (herkese açık / liste dışı / özel, ileri tarihe zamanlama)
 - Web arayüzü + komut satırı
+
+## 🎬 Uzun Videolar sekmesi (react / video izleme bölümleri)
+
+Yayıncının **video izlediği** kısımları (YouTube, TikTok, klip, film, anime...) yayının içinden bulur, her birini
+ayrı bir YouTube videosu olarak hazırlar ve **tek tıkla 1080p** yükler.
+
+1. Kick VOD linkini ver → **İzleme bölümlerini bul**.
+2. Yayından her ~20 sn'de bir 480p kare alınır (yayın indirilmez). **Claude** kareleri görüp her an için
+   *video izliyor / oyun / sohbet / ara* der ve ekranda okunabiliyorsa **izlenen videonun adını** çıkarır
+   ("Madara Olduk #129" gibi). Ardışık izleme anları bölüm olur; izlenen video değişince ayrı bölüm açılır;
+   sınırlar 5 sn hassasiyetle düzeltilir. Çok uzun bölümler parçalara ayrılır (Bölüm 1/2...).
+3. Her bölüm için hazırlanır:
+   - **Kapak (1280x720):** izlenen videodan çarpıcı bir sahne + yayıncının en çok tepki verdiği andaki yüzü
+     (beyaz çerçeve) + büyük kapak yazısı. Yazıyı değiştirip **Kapağı yenile**, başka sahne için **🎲 Sahne**.
+   - **Başlık:** "Eray - Madara Olduk #129 İzliyor!" tarzı, **açıklama** ve **etiketler**.
+   - Başlangıç/bitiş saatlerini elle düzeltebilirsin.
+4. **YouTube'a yükle:** bölüm Kick'in 1080p akışından **yeniden kodlanmadan (orijinal kalite)** kopyalanır,
+   yüklenir, kapak ayarlanır, geçici dosya silinir. Bilgisayarında kalıcı bir şey kalmaz.
+   İstersen **💾 Bilgisayara indir** ile mp4 olarak da alabilirsin.
+
+Gereksinimler / notlar:
+- Otomatik tespit için **ANTHROPIC_API_KEY** gerekir (6 saatlik yayın ≈ 1 $). Anahtar yoksa "Elle aralık gir"
+  kutusuna `1:02:00-1:25:30 Madara Olduk 129` gibi satırlar yazabilirsin; kapak/başlık yine hazırlanır.
+- YouTube'da **15 dakikadan uzun video** yüklemek için kanalın telefonla doğrulanmış olmalı: https://youtube.com/verify
+  (özel kapak için de aynısı gerekir).
+- İzlenen videolar başkalarına ait olduğundan YouTube **Content ID** telif talebi gelebilir (reklam geliri
+  hak sahibine gidebilir veya video bazı ülkelerde engellenebilir). Yayıncının iznini almayı unutma.
+- Süre (6 saatlik yayın): kare alma 3-8 dk, Claude incelemesi 2-4 dk. Yükleme süresi internet yükleme hızına bağlı
+  (20 dk 1080p ≈ 1-1.5 GB).
+- Komut satırı: `python -m kickclip uzun <link> --min 4 --max 40`
 
 ## Kurulum
 

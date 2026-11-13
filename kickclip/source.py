@@ -28,14 +28,24 @@ class Source:
     end: float = 0.0                # işlenecek aralığın sonu (mutlak sn)
     headers: dict = field(default_factory=dict)
     analysis_headers: dict = field(default_factory=dict)
+    preview: str = ""               # kare örnekleme için orta kalite (480p civarı) akış
+    preview_headers: dict = field(default_factory=dict)
     uploader: str = ""
     title: str = ""
     name: str = "yayin"
     has_audio: bool = True
     display_offset: float = 0.0     # 'full' + aralık modunda dosya 0'dan başlar; gösterilen zamana eklenir
 
+    def _target(self, which: str) -> str:
+        if which == "analysis":
+            return self.analysis
+        if which == "preview":
+            return self.preview or self.media
+        return self.media
+
     def _hdr(self, which: str) -> list[str]:
-        h = self.headers if which == "media" else self.analysis_headers
+        h = {"media": self.headers, "analysis": self.analysis_headers,
+             "preview": self.preview_headers or self.headers}[which]
         if self.kind != "stream" or not h:
             return []
         return ["-headers", "".join(f"{k}: {v}\r\n" for k, v in h.items())]
@@ -51,24 +61,34 @@ class Source:
             args += ["-ss", f"{max(0.0, start):.3f}"]
         if dur is not None:
             args += ["-t", f"{dur:.3f}"]
-        args += ["-i", self.media if which == "media" else self.analysis]
+        args += ["-i", self._target(which)]
         return args
 
-    def grab_frame(self, t: float) -> Optional[np.ndarray]:
+    def grab_jpeg(self, t: float, which: str = "media", width: Optional[int] = None,
+                  quality: int = 3) -> Optional[bytes]:
+        """t anındaki kareyi JPEG baytı olarak döndürür (width verilirse küçültülür)."""
+        vf = ["-vf", f"scale={width}:-2"] if width else []
+        cmd = ["ffmpeg", "-v", "error", *self.ff_input(which, t), "-frames:v", "1", *vf,
+               "-q:v", str(quality), "-f", "image2pipe", "-vcodec", "mjpeg", "-"]
+        for _ in range(2):
+            try:
+                out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=90).stdout
+            except subprocess.TimeoutExpired:
+                continue
+            if out:
+                return out
+        return None
+
+    def grab_frame(self, t: float, which: str = "media") -> Optional[np.ndarray]:
         """t anındaki kareyi (BGR) döndürür."""
         try:
             import cv2
         except ImportError:
             return None
-        cmd = ["ffmpeg", "-v", "error", *self.ff_input("media", t), "-frames:v", "1",
-               "-f", "image2pipe", "-vcodec", "png", "-"]
-        try:
-            out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=90).stdout
-        except subprocess.TimeoutExpired:
+        data = self.grab_jpeg(t, which, quality=2)
+        if not data:
             return None
-        if not out:
-            return None
-        return cv2.imdecode(np.frombuffer(out, np.uint8), cv2.IMREAD_COLOR)
+        return cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
 
 
 def _probe_duration(target: str, headers: dict) -> float:
@@ -93,6 +113,14 @@ def _local(path: str, rng, uploader="", title="") -> Source:
     title = title or os.path.splitext(os.path.basename(path))[0]
     return Source("local", path, path, dur, max(0.0, start), min(dur, end) if dur else end,
                   uploader=uploader, title=title, name=_safe_name(title), has_audio=has_audio)
+
+
+def _pick_preview_format(formats: list[dict], target: int = 480) -> Optional[dict]:
+    """Kare örnekleme için ~480p video akışı."""
+    vids = [f for f in formats if f.get("url") and f.get("vcodec") != "none" and f.get("height")]
+    if not vids:
+        return None
+    return min(vids, key=lambda f: (abs(f["height"] - target), f.get("tbr") or 0))
 
 
 def _pick_analysis_format(formats: list[dict]) -> Optional[dict]:
@@ -156,5 +184,7 @@ def resolve(source: str, work_dir: str, max_height: int = 1080, time_range: Opti
     start, end = rng if rng else (0.0, dur)
     log(f"İndirmeden işlenecek: analiz {ana.get('height') or 'ses'}p akıştan, klipler "
         f"{best.get('height') or '?'}p akıştan sadece gereken kısımlar çekilecek.")
+    prev = _pick_preview_format(info.get("formats") or []) or best
     return Source("stream", media_url, ana["url"], dur, max(0.0, start), min(dur, end),
-                  headers=headers, analysis_headers=a_headers, uploader=uploader, title=title, name=name)
+                  headers=headers, analysis_headers=a_headers, uploader=uploader, title=title, name=name,
+                  preview=prev["url"], preview_headers=prev.get("http_headers") or headers)

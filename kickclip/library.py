@@ -62,3 +62,25 @@ def list_clips(output_dir: str) -> list[dict]:
             if meta:
                 out.append(meta)
     return out
+
+
+def list_sections(output_dir: str) -> list[dict]:
+    """Uzun video bölümleri (bolum_XX.json)."""
+    out: list[dict] = []
+    if not os.path.isdir(output_dir):
+        return out
+    runs = sorted((d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))),
+                  key=lambda d: os.path.getmtime(os.path.join(output_dir, d)), reverse=True)
+    for run in runs:
+        rdir = os.path.join(output_dir, run)
+        for fn in sorted(os.listdir(rdir)):
+            m = re.match(r"^(bolum_\d+)\.json$", fn)
+            if not m:
+                continue
+            try:
+                meta = load_clip(output_dir, run, m.group(1))
+            except (OSError, ValueError):
+                continue
+            if meta:
+                out.append(meta)
+    return out
