@@ -1,0 +1,100 @@
+"""Komut satırı arayüzü.
+
+Örnek:
+    python -m kickclip https://kick.com/kanal/videos/xxxx --count 8 --length 30
+    python -m kickclip web            # web arayüzünü başlatır
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+
+from .config import ClipConfig
+
+
+def build_parser() -> argparse.ArgumentParser:
+    d = ClipConfig()
+    p = argparse.ArgumentParser(prog="kickclip", description="Kick yayınlarından otomatik dikey klip üretici")
+    p.add_argument("source", help="Kick linki (canlı/VOD/klip) veya yerel video dosyası. 'web' => arayüz")
+    p.add_argument("-o", "--output", default=d.output_dir, help="çıktı klasörü")
+    p.add_argument("--work", default=d.work_dir, help="geçici/indirme klasörü")
+    p.add_argument("--mode", choices=["highlights", "split"], default=d.mode,
+                   help="highlights: en hareketli anlar, split: sırayla parçala")
+    p.add_argument("-n", "--count", type=int, default=d.max_clips, help="en fazla klip sayısı")
+    p.add_argument("-l", "--length", type=float, default=d.clip_length, help="klip süresi (sn)")
+    p.add_argument("--range", dest="time_range", default=None, help="sadece bu aralık, ör. 1:00:00-2:00:00")
+    p.add_argument("--live-minutes", type=float, default=d.live_minutes, help="canlı yayında kayıt süresi (dk)")
+    p.add_argument("--max-height", type=int, default=d.max_height)
+
+    g = p.add_argument_group("yerleşim")
+    g.add_argument("--cam", default=d.cam,
+                   help="auto | top-left | top-right | bottom-left | bottom-right | none | x,y,w,h (piksel ya da 0-1 oran)")
+    g.add_argument("--cam-ratio", type=float, default=d.cam_ratio, help="üst kamera panelinin yükseklik oranı")
+    g.add_argument("--cam-size", type=float, default=d.cam_size, help="köşe preset'inde kamera genişliği oranı")
+    g.add_argument("--cam-zoom", type=float, default=d.cam_zoom, help="auto modda yüz etrafı genişlik çarpanı")
+    g.add_argument("--screen", default=d.screen, help="crop | fit | x,y,w,h")
+    g.add_argument("--screen-zoom", type=float, default=d.screen_zoom)
+
+    s = p.add_argument_group("altyazı")
+    s.add_argument("--no-subs", action="store_true", help="altyazı ekleme")
+    s.add_argument("--model", default=d.whisper_model, help="whisper modeli: tiny/base/small/medium/large-v3")
+    s.add_argument("--lang", default=d.language, help="dil kodu (tr, en...) ya da 'auto'")
+    s.add_argument("--device", default=d.device, help="auto/cpu/cuda")
+    s.add_argument("--font", default=d.font)
+    s.add_argument("--font-size", type=int, default=d.font_size)
+    s.add_argument("--words", type=int, default=d.words_per_line, help="ekranda aynı anda kelime sayısı")
+    s.add_argument("--color", default=d.highlight_color, help="vurgulanan kelime rengi")
+    s.add_argument("--sub-pos", type=float, default=d.sub_position, help="altyazı konumu 0-1")
+
+    i = p.add_argument_group("giriş efekti")
+    i.add_argument("--no-intro", action="store_true", help="zil + blur girişini kapat")
+    i.add_argument("--bell", default=None, help="kendi zil sesi dosyan")
+    i.add_argument("--bell-volume", type=float, default=d.bell_volume)
+    i.add_argument("--hold", type=float, default=d.intro_hold, help="başta bulanık kalma süresi (sn)")
+    i.add_argument("--fade", type=float, default=d.intro_fade, help="blur kalkma süresi (sn)")
+    i.add_argument("--blur", type=float, default=d.blur_strength)
+
+    e = p.add_argument_group("kodlama")
+    e.add_argument("--crf", type=int, default=d.crf)
+    e.add_argument("--preset", default=d.preset)
+    e.add_argument("--fps", type=int, default=d.fps)
+    return p
+
+
+def args_to_config(a: argparse.Namespace) -> ClipConfig:
+    return ClipConfig(
+        source=a.source, output_dir=a.output, work_dir=a.work, max_height=a.max_height,
+        time_range=a.time_range, live_minutes=a.live_minutes, mode=a.mode, clip_length=a.length,
+        max_clips=a.count, cam=a.cam, cam_ratio=a.cam_ratio, cam_size=a.cam_size, cam_zoom=a.cam_zoom,
+        screen=a.screen, screen_zoom=a.screen_zoom, subtitles=not a.no_subs, whisper_model=a.model,
+        language=None if (a.lang or "").lower() in ("", "auto") else a.lang, device=a.device,
+        font=a.font, font_size=a.font_size, words_per_line=a.words, highlight_color=a.color,
+        sub_position=a.sub_pos, intro=not a.no_intro, bell_file=a.bell, bell_volume=a.bell_volume,
+        intro_hold=a.hold, intro_fade=a.fade, blur_strength=a.blur, crf=a.crf, preset=a.preset, fps=a.fps,
+    )
+
+
+def main(argv: list[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] == "web":
+        from .web import serve
+        port = int(argv[1]) if len(argv) > 1 else 7860
+        serve(port=port)
+        return
+    args = build_parser().parse_args(argv)
+    from .pipeline import run_pipeline
+    try:
+        clips = run_pipeline(args_to_config(args))
+    except KeyboardInterrupt:
+        print("\nİptal edildi.")
+        sys.exit(130)
+    except Exception as e:
+        print(f"HATA: {e}", file=sys.stderr)
+        sys.exit(1)
+    for c in clips:
+        print(f"  {c['name']}  [{c['start_hms']}]  {c['file']}")
+
+
+if __name__ == "__main__":
+    main()

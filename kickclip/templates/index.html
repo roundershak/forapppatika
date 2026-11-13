@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KickClip</title>
+<style>
+  :root { --bg:#0b0d10; --panel:#14181d; --line:#232a31; --text:#e8edf2; --muted:#8a96a3; --accent:#53fc18; --err:#ff5d5d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { margin:0; font-size:20px; letter-spacing:.3px; }
+  header h1 span { color:var(--accent); }
+  header p { margin:0; color:var(--muted); font-size:13px; }
+  main { max-width:1200px; margin:0 auto; padding:24px; display:grid; grid-template-columns:380px 1fr; gap:24px; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; padding:16px; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; text-transform:uppercase; letter-spacing:.5px; }
+  input, select { width:100%; background:#0e1115; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font:inherit; }
+  input[type=checkbox]{ width:auto; margin-right:6px; }
+  input[type=color]{ padding:2px; height:38px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .check { display:flex; align-items:center; margin-top:12px; color:var(--text); text-transform:none; font-size:14px; letter-spacing:0; }
+  button { margin-top:16px; width:100%; background:var(--accent); color:#071003; border:0; border-radius:8px; padding:12px; font-weight:700; font-size:15px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); width:auto; padding:6px 12px; margin:0; font-weight:500; font-size:13px; }
+  details summary { cursor:pointer; color:var(--muted); margin-top:14px; font-size:13px; }
+  .hint { color:var(--muted); font-size:12px; margin-top:4px; }
+  .bar { height:8px; background:#0e1115; border-radius:99px; overflow:hidden; border:1px solid var(--line); }
+  .bar > div { height:100%; background:var(--accent); width:0; transition:width .4s; }
+  .status { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; }
+  .status b { font-size:14px; }
+  pre { background:#0e1115; border:1px solid var(--line); border-radius:8px; padding:10px; height:180px; overflow:auto; font-size:12px; color:#b8c4cf; white-space:pre-wrap; margin:12px 0 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-top:16px; }
+  .clip { background:#0e1115; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .clip video { width:100%; aspect-ratio:9/16; display:block; background:#000; }
+  .clip .meta { padding:8px 10px; font-size:12px; color:var(--muted); }
+  .clip .meta b { color:var(--text); }
+  .clip .meta a { color:var(--accent); text-decoration:none; float:right; }
+  .clip .tx { margin-top:4px; max-height:3.6em; overflow:hidden; }
+  .empty { color:var(--muted); text-align:center; padding:40px 0; }
+  .err { color:var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Kick<span>Clip</span></h1>
+    <p>Yayın linkini yapıştır → otomatik dikey klipler (kamera üstte, ekran altta, altyazı, zil + blur giriş)</p>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <form id="f">
+      <label>Kick linki veya dosya yolu</label>
+      <input name="source" placeholder="https://kick.com/kanal/videos/..." required>
+      <div class="hint">Canlı yayın, VOD veya klip linki olabilir.</div>
+
+      <div class="row">
+        <div><label>Mod</label>
+          <select name="mode">
+            <option value="highlights">En hareketli anlar</option>
+            <option value="split">Sırayla parçala</option>
+          </select></div>
+        <div><label>Klip sayısı</label><input name="max_clips" type="number" min="1" max="100" value="{{ d.max_clips }}"></div>
+      </div>
+      <div class="row">
+        <div><label>Klip süresi (sn)</label><input name="clip_length" type="number" min="5" max="180" value="{{ d.clip_length|int }}"></div>
+        <div><label>Zaman aralığı</label><input name="time_range" placeholder="1:00:00-2:00:00"></div>
+      </div>
+
+      <label>Yayıncı kamerası</label>
+      <select name="cam">
+        <option value="auto">Otomatik bul (yüz tespiti)</option>
+        <option value="top-left">Sol üst köşe</option>
+        <option value="top-right">Sağ üst köşe</option>
+        <option value="bottom-left">Sol alt köşe</option>
+        <option value="bottom-right">Sağ alt köşe</option>
+        <option value="none">Kamera yok (tam ekran)</option>
+        <option value="custom">Elle (x,y,w,h)</option>
+      </select>
+      <input name="cam_custom" placeholder="x,y,w,h  ör. 0.72,0.62,0.27,0.36" style="margin-top:6px; display:none">
+
+      <label>Alt panel (ekran)</label>
+      <select name="screen">
+        <option value="crop">Ortadan kırp (tam dolu)</option>
+        <option value="fit">Tamamını sığdır (bulanık arka plan)</option>
+      </select>
+
+      <label class="check"><input type="checkbox" name="subtitles" checked> Altyazı ekle</label>
+      <label class="check"><input type="checkbox" name="intro" checked> Zil sesi + blur giriş</label>
+
+      <details>
+        <summary>Gelişmiş ayarlar</summary>
+        <div class="row">
+          <div><label>Whisper modeli</label>
+            <select name="whisper_model">
+              <option>tiny</option><option>base</option><option selected>small</option><option>medium</option><option>large-v3</option>
+            </select></div>
+          <div><label>Dil</label><input name="language" value="tr"></div>
+        </div>
+        <div class="row">
+          <div><label>Yazı boyutu</label><input name="font_size" type="number" value="{{ d.font_size }}"></div>
+          <div><label>Kelime / satır</label><input name="words_per_line" type="number" min="1" max="8" value="{{ d.words_per_line }}"></div>
+        </div>
+        <div class="row">
+          <div><label>Vurgu rengi</label><input name="highlight_color" type="color" value="{{ d.highlight_color }}"></div>
+          <div><label>Kamera paneli oranı</label><input name="cam_ratio" type="number" step="0.05" min="0.2" max="0.6" value="{{ d.cam_ratio }}"></div>
+        </div>
+        <div class="row">
+          <div><label>Kamera zoom (auto)</label><input name="cam_zoom" type="number" step="0.1" value="{{ d.cam_zoom }}"></div>
+          <div><label>Blur süresi (sn)</label><input name="intro_hold" type="number" step="0.05" value="{{ d.intro_hold }}"></div>
+        </div>
+        <div class="row">
+          <div><label>Zil ses seviyesi</label><input name="bell_volume" type="number" step="0.1" value="{{ d.bell_volume }}"></div>
+          <div><label>Canlı kayıt (dk)</label><input name="live_minutes" type="number" value="{{ d.live_minutes|int }}"></div>
+        </div>
+      </details>
+
+      <button id="go" type="submit">Klipleri üret</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="status">
+      <b id="st">Hazır</b>
+      <button class="ghost" id="cancel" style="display:none">Durdur</button>
+    </div>
+    <div class="bar"><div id="pb"></div></div>
+    <pre id="log">Link yapıştırıp "Klipleri üret"e bas.</pre>
+    <div class="grid" id="clips"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const form = $('#f');
+let current = null, timer = null, shown = 0;
+
+form.cam.addEventListener('change', () => {
+  form.cam_custom.style.display = form.cam.value === 'custom' ? 'block' : 'none';
+});
+
+const statusText = {queued:'Sırada', running:'Çalışıyor', done:'Tamamlandı ✓', error:'Hata', cancelled:'Durduruldu'};
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(form);
+  const body = Object.fromEntries(fd.entries());
+  body.subtitles = form.subtitles.checked;
+  body.intro = form.intro.checked;
+  if (body.cam === 'custom') body.cam = body.cam_custom;
+  delete body.cam_custom;
+  $('#go').disabled = true;
+  const r = await fetch('/api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { alert(j.error || 'Hata'); $('#go').disabled = false; return; }
+  current = j.id; shown = 0; $('#clips').innerHTML = '';
+  poll();
+});
+
+$('#cancel').onclick = () => current && fetch(`/api/jobs/${current}/cancel`, {method:'POST'});
+
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function poll(){
+  clearTimeout(timer);
+  const r = await fetch(`/api/jobs/${current}`);
+  if (!r.ok) return;
+  const j = await r.json();
+  $('#st').textContent = statusText[j.status] || j.status;
+  $('#st').className = j.status === 'error' ? 'err' : '';
+  $('#pb').style.width = (j.progress*100).toFixed(1) + '%';
+  const log = $('#log');
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+  log.textContent = j.logs.join('\n');
+  if (atBottom) log.scrollTop = log.scrollHeight;
+  for (; shown < j.clips.length; shown++) {
+    const c = j.clips[shown];
+    const el = document.createElement('div');
+    el.className = 'clip';
+    el.innerHTML = `<video controls preload="metadata" ${c.thumb_id?`poster="/files/${c.thumb_id}"`:''} src="/files/${c.video_id}"></video>
+      <div class="meta"><b>${esc(c.name)}</b> · ${esc(c.start_hms)}
+        <a href="/files/${c.video_id}?dl=1">İndir ↓</a>
+        <div class="tx">${esc(c.transcript)}</div></div>`;
+    $('#clips').appendChild(el);
+  }
+  const running = j.status === 'queued' || j.status === 'running';
+  $('#cancel').style.display = running ? '' : 'none';
+  $('#go').disabled = running;
+  if (running) timer = setTimeout(poll, 1500);
+}
+</script>
+</body>
+</html>
