@@ -189,9 +189,9 @@ def chirps(dur=0.8):
 # ---------------------------------------------------------------- ambience
 def rain_amount(t):
     p = lambda a, b: np.clip((t - a) / (b - a), 0, 1)
-    return np.maximum.reduce([p(6.0, 6.5) * (1 - p(8.0, 8.5)),
-                              p(17.25, 17.7) * (1 - p(20.5, 21.0)),
-                              0.65 * p(28.25, 28.8)])
+    return np.maximum.reduce([p(6.15, 6.6) * (1 - p(8.0, 8.4)),
+                              p(18.2, 18.6) * (1 - p(20.5, 20.9)),
+                              0.65 * p(28.3, 28.8)])
 
 
 def rain_bed():
@@ -296,38 +296,42 @@ def main():
     sfx = Track()
     sfx.add(wind_bed(), 0, db(-14))
     sfx.add(ding(1320, 1.2), 2.45, db(-16))                       # idea "!"
-    sfx.add(whoosh(0.35), 4.0, db(-24))
-    for dt in (4.35, 4.6, 4.85, 5.1):                             # blocks land
-        sfx.add(thud(90 + 10 * rng.standard_normal()), dt + 0.145, db(-9))
-        sfx.add(thud(110), dt + 0.30, db(-20))
-    sfx.add(whoosh(0.3, 200, 1500), 5.2, db(-18))                 # cardboard placed
-    sfx.add(squelch(), 5.31, db(-18))
-    sfx.add(boing(220, 480, 0.25), 5.5, db(-22))
-    sfx.add(boing(240, 520, 0.25), 5.8, db(-22))
-    sfx.add(squelch(), 7.12, db(-10))                             # cardboard collapse
-    sfx.add(thud(70, 0.4), 7.36, db(-10))
-    sfx.add(womp(), 7.42, db(-15))                                # comic "womp womp"
+    for i in range(4):                                            # foundation slabs lock in
+        sfx.add(whoosh(0.3, 300, 2500), 4.3 + i * 0.12 - 0.15, db(-24))
+        sfx.add(thud(80, 0.35), 4.3 + i * 0.12 + 0.3, db(-11))
+    sfx.add(boing(90, 260, 0.4, 5), 4.95, db(-20))                # posts rise
+    sfx.add(whoosh(0.3, 200, 1500), 5.3, db(-18))                 # cardboard
+    sfx.add(squelch(), 5.45, db(-18))
+    sfx.add(boing(220, 480, 0.2), 5.97, db(-22))
+    sfx.add(boing(240, 520, 0.2), 6.17, db(-22))
+    sfx.add(squelch(), 7.05, db(-10))                             # cardboard collapse
+    sfx.add(thud(70, 0.4), 7.3, db(-10))
+    sfx.add(womp(), 7.42, db(-15))                                # "womp womp"
     sfx.add(whoosh(0.5), 8.05, db(-16))                           # cardboard flies away
-    sfx.add(boing(120, 300, 0.45, 6), 8.3, db(-22))               # pillars grow
-    sfx.add(whoosh(0.3), 8.6, db(-20))
-    sfx.add(wood_knock(0.5, 160), 8.745, db(-9))                  # wood roof lands
-    total_bricks = 165
-    for k in range(18):                                           # brick clicks
-        sfx.add(click(0.8 + 0.4 * rng.random()), 9.0 + k * 1.55 / 18 + 0.05, db(-15))
-    sfx.add(ding(1760, 0.6), 10.75, db(-24))                      # proud
-    for b in (12.65, 13.68):                                      # head bonks
-        sfx.add(bonk(), b, db(-7))
-        sfx.add(chirps(0.7), b + 0.12, db(-22))
-    sfx.add(pop(), 14.7, db(-16))                                 # "?"
-    sfx.add(boing(110, 420, 0.95, 7), 16.3, db(-14))              # house stretches
-    sfx.add(creak(0.9), 16.3, db(-20))
-    for k in range(10):                                           # drips into the house
-        sfx.add(plip(), 17.9 + k * 0.19 + 0.05 * rng.random(), db(-20))
-    sfx.add(band(rng.standard_normal(3000), 300, 3000) * env_ad(3000, 0.001, 0.01), 18.5, db(-12))  # facepalm
-    sfx.add(boing(160, 600, 0.7, 9), 20.3, db(-14))               # roof stretches
-    sfx.add(wood_knock(0.45, 140), 21.2, db(-10))                 # door lands
-    sfx.add(pop(), 21.38, db(-14))
-    sfx.add(pop(), 21.78, db(-14))
+    sfx.add(boing(120, 300, 0.35, 6), 8.15, db(-22))              # posts grow
+    sfx.add(whoosh(1.8, 400, 3000), 8.0, db(-22))                 # bricks lift into the air
+    for k in range(26):                                           # bricks click into place
+        sfx.add(click(0.7 + 0.6 * rng.random()), 8.4 + k * 2.0 / 26, db(-15))
+    for k in range(8):                                            # roof frame
+        sfx.add(wood_knock(0.3, 150 + 20 * rng.random()), 10.3 + k * 0.1, db(-16))
+    for k in range(6):                                            # deck boards
+        sfx.add(wood_knock(0.25, 210), 10.9 + k * 0.07, db(-19))
+    sfx.add(ding(1760, 0.6), 11.05, db(-24))                      # proud
+    sfx.add(whoosh(0.9, 500, 5000), 12.6, db(-12))                # icy gust through bare walls
+    sfx.add(chirps(0.5), 13.25, db(-22))
+    for k in range(9):                                            # insulation panels "fump"
+        sfx.add(band(thud(160, 0.15), 100, 2500), 16.5 + k * 0.08, db(-16))
+    sfx.add(whoosh(0.9, 800, 6000), 16.95, db(-16))               # plaster sweep
+    sfx.add(ding(1568, 0.8), 17.35, db(-22))                      # warm & happy
+    for k in range(12):                                           # leak drips on his head
+        sfx.add(plip(), 18.4 + k * 0.15 + 0.04 * rng.random(), db(-17))
+    sfx.add(band(rng.standard_normal(3000), 300, 3000) * env_ad(3000, 0.001, 0.01), 18.95, db(-12))  # facepalm
+    for k in range(24):                                           # roof tiles clack
+        sfx.add(click(0.5 + 0.3 * rng.random()), 20.4 + k * 0.045, db(-16))
+    sfx.add(wood_knock(0.4, 130), 21.5, db(-12))                  # chimney/cap
+    sfx.add(wood_knock(0.45, 140), 21.6, db(-11))                 # door planks
+    sfx.add(pop(), 21.8, db(-14))
+    sfx.add(pop(), 22.1, db(-14))
     sfx.add(tink(), 23.0, db(-14))                                # tap crooked window
     sfx.add(boing(300, 700, 0.4, 14), 23.05, db(-22))
     sfx.add(creak(0.45), 25.4, db(-12))                           # door opens
@@ -335,8 +339,8 @@ def main():
     sfx.add(click(0.6), 28.45, db(-14))                           # light switch
     sfx.add(ding(1568, 1.2), 28.5, db(-20))
 
-    for a, b in [(0.05, 2.4), (4.0, 4.35), (12.0, 12.4), (16.0, 16.3), (17.2, 17.6), (21.0, 21.6),
-                 (22.55, 22.85), (23.45, 23.85), (24.6, 25.3), (27.45, 28.05)]:     # footsteps
+    for a, b in [(0.05, 2.4), (4.0, 4.35), (5.5, 5.95), (7.0, 7.3), (12.0, 12.9), (13.25, 13.85), (16.0, 16.4),
+                 (17.85, 18.3), (20.0, 20.5), (22.4, 22.75), (23.45, 23.85), (24.6, 25.3), (27.45, 28.05)]:  # footsteps
         k = a
         while k < b:
             sfx.add(band(thud(140, 0.12), 80, 2500), k, db(-22))

@@ -10,8 +10,8 @@ import re
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TL = json.load(open(os.path.join(ROOT, "timeline.json"), encoding="utf-8"))
-KEY = {"ev", "çatı", "çatıyı", "yağmur", "duvarları", "hazırım", "sığacağım", "unuttum",
-       "pencereleri", "sabır", "tebrikler", "inşa", "ıslanmak", "yok"}
+KEY = {"ev", "çatı", "çatıyı", "yağmur", "duvarları", "hazırım", "soğuk", "yalıttım", "sıvadım",
+       "akıyor", "kiremitleri", "pencereleri", "sabır", "tebrikler", "inşa", "ıslanmak", "yok"}
 MAX_LINE = 22
 
 

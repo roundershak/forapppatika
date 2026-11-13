@@ -1,44 +1,20 @@
 [
   {
-    "id": "s1",
-    "audio": "s1.mp3",
-    "duration": 3.576,
-    "text": "Dışarıda kalmaktan sıkıldım. Kendime bir ev yapmaya karar verdim!"
-  },
-  {
-    "id": "s2",
-    "audio": "s2.mp3",
-    "duration": 3.762,
-    "text": "Önce basit bir çatı yaptım. Ama küçük bir sorun var… Yağmur!"
-  },
-  {
-    "id": "s3",
-    "audio": "s3.mp3",
-    "duration": 3.019,
-    "text": "Çatıyı düzelttim, duvarları da ördüm. Artık hazırım!"
-  },
-  {
     "id": "s4",
     "audio": "s4.mp3",
     "duration": 2.647,
-    "text": "Bir dakika… Ben bu eve nasıl sığacağım?"
+    "text": "Bir dakika… İçerisi dışarıdan bile soğuk!"
   },
   {
     "id": "s5",
     "audio": "s5.mp3",
-    "duration": 2.926,
-    "text": "Evi büyüttüm. Ama bu sefer de çatıyı unuttum!"
+    "duration": 3.901,
+    "text": "Duvarları yalıttım, sıvadım. Ama bu sefer de çatı akıyor!"
   },
   {
     "id": "s6",
     "audio": "s6.mp3",
-    "duration": 4.226,
-    "text": "Çatıyı uzattım, pencereleri taktım. Biraz mimarlık, biraz sabır!"
-  },
-  {
-    "id": "s7",
-    "audio": "s7.mp3",
-    "duration": 5.387,
-    "text": "Ve işte! Tebrikler, artık bir ev inşa ettin. Artık yağmurda ıslanmak yok!"
+    "duration": 4.551,
+    "text": "Kiremitleri dizdim, pencereleri taktım. Biraz mimarlık, biraz sabır!"
   }
 ]

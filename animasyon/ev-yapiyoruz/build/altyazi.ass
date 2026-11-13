@@ -18,12 +18,12 @@ Dialogue: 0,0:00:05.71,0:00:07.11,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140
 Dialogue: 0,0:00:07.13,0:00:08.11,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Yağmur!{\c&HFFFFFF&}
 Dialogue: 0,0:00:08.15,0:00:10.17,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Çatıyı{\c&HFFFFFF&} düzelttim,\N{\c&H3C96F5&}duvarları{\c&HFFFFFF&} da ördüm.
 Dialogue: 0,0:00:10.19,0:00:11.47,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Artık {\c&H3C96F5&}hazırım!{\c&HFFFFFF&}
-Dialogue: 0,0:00:12.80,0:00:13.87,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Bir dakika…
-Dialogue: 0,0:00:13.89,0:00:15.75,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Ben bu eve\Nnasıl {\c&H3C96F5&}sığacağım?{\c&HFFFFFF&}
-Dialogue: 0,0:00:16.20,0:00:17.22,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Evi büyüttüm.
-Dialogue: 0,0:00:17.27,0:00:19.43,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Ama bu sefer de\N{\c&H3C96F5&}çatıyı{\c&HFFFFFF&} {\c&H3C96F5&}unuttum!{\c&HFFFFFF&}
-Dialogue: 0,0:00:20.10,0:00:22.39,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Çatıyı{\c&HFFFFFF&} uzattım,\N{\c&H3C96F5&}pencereleri{\c&HFFFFFF&} taktım.
-Dialogue: 0,0:00:22.41,0:00:24.43,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Biraz mimarlık,\Nbiraz {\c&H3C96F5&}sabır!{\c&HFFFFFF&}
-Dialogue: 0,0:00:24.45,0:00:25.45,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Ve işte!
-Dialogue: 0,0:00:25.69,0:00:28.12,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Tebrikler,{\c&HFFFFFF&} artık\Nbir {\c&H3C96F5&}ev{\c&HFFFFFF&} {\c&H3C96F5&}inşa{\c&HFFFFFF&} ettin.
-Dialogue: 0,0:00:28.14,0:00:29.98,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Artık yağmurda\N{\c&H3C96F5&}ıslanmak{\c&HFFFFFF&} {\c&H3C96F5&}yok!{\c&HFFFFFF&}
+Dialogue: 0,0:00:13.15,0:00:14.13,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Bir dakika…
+Dialogue: 0,0:00:14.15,0:00:16.03,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}İçerisi dışarıdan\Nbile {\c&H3C96F5&}soğuk!{\c&HFFFFFF&}
+Dialogue: 0,0:00:16.05,0:00:18.07,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Duvarları{\c&HFFFFFF&}\N{\c&H3C96F5&}yalıttım,{\c&HFFFFFF&} {\c&H3C96F5&}sıvadım.{\c&HFFFFFF&}
+Dialogue: 0,0:00:18.31,0:00:19.93,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Ama bu sefer\Nde {\c&H3C96F5&}çatı{\c&HFFFFFF&} {\c&H3C96F5&}akıyor!{\c&HFFFFFF&}
+Dialogue: 0,0:00:19.95,0:00:22.44,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Kiremitleri{\c&HFFFFFF&} dizdim,\N{\c&H3C96F5&}pencereleri{\c&HFFFFFF&} taktım.
+Dialogue: 0,0:00:22.55,0:00:24.51,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Biraz mimarlık,\Nbiraz {\c&H3C96F5&}sabır!{\c&HFFFFFF&}
+Dialogue: 0,0:00:24.53,0:00:25.53,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Ve işte!
+Dialogue: 0,0:00:25.77,0:00:28.20,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}{\c&H3C96F5&}Tebrikler,{\c&HFFFFFF&} artık\Nbir {\c&H3C96F5&}ev{\c&HFFFFFF&} {\c&H3C96F5&}inşa{\c&HFFFFFF&} ettin.
+Dialogue: 0,0:00:28.22,0:00:29.98,Ana,,0,0,0,,{\fad(70,90)\fscx88\fscy88\t(0,140,\fscx100\fscy100)}Artık yağmurda\N{\c&H3C96F5&}ıslanmak{\c&HFFFFFF&} {\c&H3C96F5&}yok!{\c&HFFFFFF&}
