@@ -117,9 +117,9 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
 
     graph, vlabel, alabel = build_filtergraph(cfg, cam, screen_mode, screen, has_audio,
                                               bell, ass_rel, fonts_rel)
-    graph_file = os.path.join(clip_dir, os.path.splitext(os.path.basename(out_path))[0] + "_filter.txt")
-    with open(graph_file, "w", encoding="utf-8") as f:
-        f.write(graph)
+    # Filtre doğrudan komuta yazılır: ffmpeg 8 '-filter_complex_script' seçeneğini kaldırdı,
+    # satır içi '-filter_complex' tüm sürümlerde (4.x - 8.x) çalışır.
+    graph_inline = graph.replace("\n", "")
 
     # input_args: Source.ff_input(...) -> yerel dosya ya da akış adresi (sadece bu aralık çekilir)
     input_args = [os.path.abspath(a) if i > 0 and input_args[i - 1] == "-i" and os.path.exists(a) else a
@@ -127,7 +127,7 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *input_args]
     if cfg.intro and bell:
         cmd += ["-i", os.path.abspath(bell)]
-    cmd += ["-filter_complex_script", os.path.basename(graph_file),
+    cmd += ["-filter_complex", graph_inline,
             "-map", vlabel, "-map", alabel,
             # ekran kartı (NVENC) varsa onunla, yoksa libx264
             *video_encoder_args(cfg.crf - 2 if cfg.out_size()[1] > 1920 else cfg.crf, cfg.preset,
@@ -157,10 +157,6 @@ def render_clip(cfg: ClipConfig, input_args: list[str], duration: float, out_pat
                 cmd[i:j] = video_encoder_args(cfg.crf, cfg.preset, None)
     if last_err:
         raise last_err
-    try:
-        os.remove(graph_file)
-    except OSError:
-        pass
 
 
 def make_thumbnail(video: str, out_jpg: str, at: float = 1.5) -> None:
